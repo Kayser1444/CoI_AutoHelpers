@@ -43,13 +43,50 @@ namespace CoI.AutoHelpers.Localization
             }
         }
 
-        public int RebindStaticLocalizationFields(Assembly modAssembly, IReadOnlyCollection<string> translationKeyPrefixes)
+        public int ScanForStaticLocStrFields(Assembly modAssembly)
         {
             if (modAssembly == null)
             {
                 throw new ArgumentNullException(nameof(modAssembly));
             }
 
+            Type localizationManagerType = ResolveType("Mafi.Localization.LocalizationManager", required: true);
+            MethodInfo? scanMethod = localizationManagerType.GetMethod(
+                "ScanForStaticLocStrFields",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(Assembly) },
+                null);
+            if (scanMethod == null)
+            {
+                return 0;
+            }
+
+            object? result = scanMethod.Invoke(null, new object[] { modAssembly });
+            if (result is int scannedCount)
+            {
+                return scannedCount;
+            }
+
+            return 0;
+        }
+
+        public LocalizationRebindResult RebindStaticLocalizationFields(
+            Assembly modAssembly,
+            TranslationBundle bundle,
+            IReadOnlyCollection<string> translationKeyPrefixes)
+        {
+            if (modAssembly == null)
+            {
+                throw new ArgumentNullException(nameof(modAssembly));
+            }
+
+            if (bundle == null)
+            {
+                throw new ArgumentNullException(nameof(bundle));
+            }
+
+            Type localizationManagerType = ResolveType("Mafi.Localization.LocalizationManager", required: true);
             Type locType = ResolveType("Mafi.Localization.Loc", required: true);
             Type locStrType = ResolveType("Mafi.Localization.LocStr", required: true);
             Type locStr1Type = ResolveType("Mafi.Localization.LocStr1", required: true);
@@ -58,14 +95,28 @@ namespace CoI.AutoHelpers.Localization
             Type locStr3Type = ResolveType("Mafi.Localization.LocStr3", required: true);
             Type locStr4Type = ResolveType("Mafi.Localization.LocStr4", required: true);
 
-            MethodInfo strMethod = ResolveMethod(locType, "Str", typeof(string), typeof(string), typeof(string));
-            MethodInfo str1Method = ResolveMethod(locType, "Str1", typeof(string), typeof(string), typeof(string));
-            MethodInfo str1PluralMethod = ResolveMethod(locType, "Str1Plural", typeof(string), typeof(string), typeof(string), typeof(string));
+            // Resolve GetLocalizedStringNArg directly from LocalizationManager (not via Loc.Str wrappers)
+            // so we can pass ignoreDuplicates:true and avoid harmless-but-noisy duplicate ID log errors
+            // that occur when the same LocStr field IDs were already registered at static init time.
+            MethodInfo strMethod = ResolveMethod(localizationManagerType, "GetLocalizedString0Arg", typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
+            MethodInfo str1Method = ResolveMethod(localizationManagerType, "GetLocalizedString1Arg", typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
+            MethodInfo str1PluralMethod = ResolveMethod(localizationManagerType, "GetLocalizedString1Arg", typeof(string), typeof(string), typeof(string), typeof(string));
             MethodInfo str2Method = ResolveMethod(locType, "Str2", typeof(string), typeof(string), typeof(string));
             MethodInfo str3Method = ResolveMethod(locType, "Str3", typeof(string), typeof(string), typeof(string));
             MethodInfo str4Method = ResolveMethod(locType, "Str4", typeof(string), typeof(string), typeof(string));
 
+            HashSet<string> translationKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (TranslationEntry entry in bundle.Entries)
+            {
+                translationKeys.Add(entry.Key);
+            }
+
+            List<TranslationDiagnostic> diagnostics = new List<TranslationDiagnostic>();
+            int scannedFieldCount = 0;
             int reboundCount = 0;
+            int skippedReadonlyCount = 0;
+            int skippedMissingTranslationCount = 0;
+            int failedCount = 0;
 
             foreach (Type type in modAssembly.GetTypes())
             {
@@ -104,7 +155,7 @@ namespace CoI.AutoHelpers.Localization
                         }
 
                         string fallback = GetOptionalStringField(currentValue, "TranslatedString") ?? string.Empty;
-                        reboundValue = strMethod.Invoke(null, new object[] { id, fallback, RebindComment });
+                        reboundValue = strMethod.Invoke(null, new object[] { id, fallback, RebindComment, false, true });
                     }
                     else if (fieldType == locStr1Type)
                     {
@@ -114,7 +165,7 @@ namespace CoI.AutoHelpers.Localization
                         }
 
                         string fallback = GetOptionalStringField(currentValue, "m_translatedString") ?? "{0}";
-                        reboundValue = str1Method.Invoke(null, new object[] { id, fallback, RebindComment });
+                        reboundValue = str1Method.Invoke(null, new object[] { id, fallback, RebindComment, false, true });
                     }
                     else if (fieldType == locStr1PluralType)
                     {
@@ -161,9 +212,25 @@ namespace CoI.AutoHelpers.Localization
                         string fallback = GetOptionalStringField(currentValue, "m_translatedString") ?? "{0}{1}{2}{3}";
                         reboundValue = str4Method.Invoke(null, new object[] { id, fallback, RebindComment });
                     }
+                    else
+                    {
+                        continue;
+                    }
 
                     if (reboundValue == null)
                     {
+                        continue;
+                    }
+
+                    scannedFieldCount += 1;
+
+                    if (!translationKeys.Contains(id))
+                    {
+                        skippedMissingTranslationCount += 1;
+                        diagnostics.Add(new TranslationDiagnostic(
+                            TranslationDiagnosticSeverity.Warning,
+                            type.FullName ?? modAssembly.GetName().Name ?? "<unknown>",
+                            $"No translation entry exists for key '{id}' on field '{field.Name}'."));
                         continue;
                     }
 
@@ -172,14 +239,35 @@ namespace CoI.AutoHelpers.Localization
                         field.SetValue(null, reboundValue);
                         reboundCount += 1;
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Rebinding should be best effort. Unsupported readonly fields are skipped.
+                        if (field.IsInitOnly)
+                        {
+                            skippedReadonlyCount += 1;
+                            diagnostics.Add(new TranslationDiagnostic(
+                                TranslationDiagnosticSeverity.Warning,
+                                type.FullName ?? modAssembly.GetName().Name ?? "<unknown>",
+                                $"Failed to rebind readonly static field '{field.Name}' for key '{id}': {ex.Message}"));
+                        }
+                        else
+                        {
+                            failedCount += 1;
+                            diagnostics.Add(new TranslationDiagnostic(
+                                TranslationDiagnosticSeverity.Error,
+                                type.FullName ?? modAssembly.GetName().Name ?? "<unknown>",
+                                $"Failed to rebind field '{field.Name}' for key '{id}': {ex.Message}"));
+                        }
                     }
                 }
             }
 
-            return reboundCount;
+            return new LocalizationRebindResult(
+                scannedFieldCount,
+                reboundCount,
+                skippedReadonlyCount,
+                skippedMissingTranslationCount,
+                failedCount,
+                diagnostics);
         }
 
         private static object CreateStringImmutableArray(TranslationEntry entry)

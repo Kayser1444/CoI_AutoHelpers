@@ -27,6 +27,18 @@ namespace CoI.AutoHelpers.Localization
                 throw new ArgumentNullException(nameof(options));
             }
 
+            string desiredCulture = ResolveCurrentCultureCode() ?? "en-US";
+            if (IsEnglishCulture(desiredCulture))
+            {
+                List<TranslationDiagnostic> englishDiagnostics = new List<TranslationDiagnostic>();
+                englishDiagnostics.Add(new TranslationDiagnostic(
+                    TranslationDiagnosticSeverity.Info,
+                    options.TranslationsDirectory,
+                    $"Active culture '{desiredCulture}' is English, so no mod translation bundle will be applied."));
+
+                return new ModTranslationsApplyResult(desiredCulture, 0, CreateEmptyRebindResult(), englishDiagnostics);
+            }
+
             TranslationLoadResult loadResult = m_loader.LoadFromDirectory(options.TranslationsDirectory, options.DuplicateKeyBehavior);
             List<TranslationDiagnostic> diagnostics = new List<TranslationDiagnostic>(loadResult.Diagnostics);
 
@@ -38,23 +50,40 @@ namespace CoI.AutoHelpers.Localization
                     options.TranslationsDirectory,
                     "No translation bundles were discovered. Skipping runtime splice and rebind."));
 
-                return new ModTranslationsApplyResult(currentCulture, 0, 0, diagnostics);
+                return new ModTranslationsApplyResult(currentCulture, 0, CreateEmptyRebindResult(), diagnostics);
             }
 
-            string desiredCulture = ResolveCurrentCultureCode() ?? "en-US";
-            TranslationBundle selectedBundle = SelectBestBundle(loadResult.Bundles, desiredCulture);
+            TranslationBundle? selectedBundle = SelectBestBundle(loadResult.Bundles, desiredCulture);
+            if (selectedBundle == null)
+            {
+                diagnostics.Add(new TranslationDiagnostic(
+                    TranslationDiagnosticSeverity.Warning,
+                    options.TranslationsDirectory,
+                    $"No translation bundle matched the active culture '{desiredCulture}'. Skipping runtime splice and rebind."));
+
+                return new ModTranslationsApplyResult(desiredCulture, 0, CreateEmptyRebindResult(), diagnostics);
+            }
 
             m_runtime.UpsertTranslations(selectedBundle);
-            int reboundCount = m_runtime.RebindStaticLocalizationFields(options.ModAssembly, options.TranslationKeyPrefixes);
+            int scannedFieldCount = m_runtime.ScanForStaticLocStrFields(options.ModAssembly);
+            LocalizationRebindResult rebindResult = m_runtime.RebindStaticLocalizationFields(
+                options.ModAssembly,
+                selectedBundle,
+                options.TranslationKeyPrefixes);
+            diagnostics.AddRange(rebindResult.Diagnostics);
+            diagnostics.Add(new TranslationDiagnostic(
+                TranslationDiagnosticSeverity.Info,
+                options.TranslationsDirectory,
+                $"Scanned {scannedFieldCount} static LocStr field(s) before rebinding."));
 
             return new ModTranslationsApplyResult(
                 selectedBundle.LocaleCode,
                 selectedBundle.Entries.Count,
-                reboundCount,
+                rebindResult,
                 diagnostics);
         }
 
-        private static TranslationBundle SelectBestBundle(IReadOnlyList<TranslationBundle> bundles, string desiredCulture)
+        private static TranslationBundle? SelectBestBundle(IReadOnlyList<TranslationBundle> bundles, string desiredCulture)
         {
             TranslationBundle? exact = FindLocaleMatch(bundles, desiredCulture);
             if (exact != null)
@@ -73,13 +102,19 @@ namespace CoI.AutoHelpers.Localization
                 }
             }
 
-            TranslationBundle? english = FindLocaleMatch(bundles, "en-US") ?? FindLocaleMatch(bundles, "en");
-            if (english != null)
-            {
-                return english;
-            }
+            return null;
+        }
 
-            return bundles[0];
+        private static LocalizationRebindResult CreateEmptyRebindResult()
+        {
+            return new LocalizationRebindResult(0, 0, 0, 0, 0, new List<TranslationDiagnostic>());
+        }
+
+        private static bool IsEnglishCulture(string cultureCode)
+        {
+            return string.Equals(cultureCode, "en", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cultureCode, "en-US", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(cultureCode, "en-GB", StringComparison.OrdinalIgnoreCase);
         }
 
         private static TranslationBundle? FindLocaleMatch(IReadOnlyList<TranslationBundle> bundles, string localeCode)

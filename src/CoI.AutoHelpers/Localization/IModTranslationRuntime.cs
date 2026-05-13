@@ -7,6 +7,11 @@ namespace CoI.AutoHelpers.Localization
     {
         void UpsertTranslations(TranslationBundle bundle);
 
-        int RebindStaticLocalizationFields(Assembly modAssembly, IReadOnlyCollection<string> translationKeyPrefixes);
+        int ScanForStaticLocStrFields(Assembly modAssembly);
+
+        LocalizationRebindResult RebindStaticLocalizationFields(
+            Assembly modAssembly,
+            TranslationBundle bundle,
+            IReadOnlyCollection<string> translationKeyPrefixes);
     }
 }
