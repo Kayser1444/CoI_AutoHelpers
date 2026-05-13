@@ -1,0 +1,33 @@
+<!-- CoI AutoHelpers
+Copyright (c) 2026 Kayser
+Licensed under the MIT License.
+
+This project exists to validate the helper source set as a buildable library. The
+released Captain of Industry mods should still consume the helper as source.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>CoI.AutoHelpers</AssemblyName>
+    <RootNamespace>CoI.AutoHelpers</RootNamespace>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Localization\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="mscorlib" />
+  </ItemGroup>
+
+</Project>

@@ -43,6 +43,8 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 - [Source-submodule and VS Code workspace approach](docs/source-submodule-workflow.md)
 - [Helper architecture](docs/helper-architecture.md)
+- [Localization framework build plan](docs/localization-framework-build-plan.md)
+- [Mod integration example](docs/mod-integration-example.md)
 - [Backlog](BACKLOG.md)
 - [Changelog](CHANGELOG.md)
 
@@ -54,7 +56,9 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 - Translation file layout
 - Early translation loading strategy
 - Static `LocStr` rebind strategy
-- English template export strategy
+- Initial `ModTranslations` apply pipeline (load -> select locale -> splice -> rebind)
+- Explicit deferred UI refresh queue for targeted late-bound text updates
+- Deterministic English template export service with prefix and TODO/HIDE filters
 
 ### Planned placeholders
 
@@ -75,4 +79,4 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 ## Repository status
 
-Bootstrap stage. No stable public API yet.
+Bootstrap stage. Localization data model, runtime contracts, and a buildable helper project scaffold have been added, but there is no stable public API yet.

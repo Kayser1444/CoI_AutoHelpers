@@ -2,14 +2,17 @@
 
 ## Localization
 
-- Implement translation file discovery
-- Implement translation splice into `LocalizationManager.s_data`
-- Implement static `LocStr` rebind
-- Implement `LaterText` deferred UI helpers
-- Implement English translation export
 - Add structured localization logging
 - Define translation key naming conventions
 - Add tests against CoI localization edge cases
+
+### Done
+
+- Translation file discovery
+- Translation splice into `LocalizationManager.s_data`
+- Static `LocStr` rebind
+- `LaterText` deferred UI helpers
+- English translation export
 
 ## Attributes
 

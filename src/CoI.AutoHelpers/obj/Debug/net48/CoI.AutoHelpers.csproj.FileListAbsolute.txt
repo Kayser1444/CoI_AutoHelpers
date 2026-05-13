@@ -1,0 +1,10 @@
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\bin\Debug\net48\CoI.AutoHelpers.dll
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\bin\Debug\net48\CoI.AutoHelpers.pdb
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.csproj.AssemblyReference.cache
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.AssemblyInfoInputs.cache
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.AssemblyInfo.cs
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.csproj.CoreCompileInputs.cache
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.sourcelink.json
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.dll
+C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers\src\CoI.AutoHelpers\obj\Debug\net48\CoI.AutoHelpers.pdb
