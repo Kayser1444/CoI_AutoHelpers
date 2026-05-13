@@ -26,7 +26,6 @@ released Captain of Industry mods should still consume the helper as source.
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Web.Extensions" />
     <Reference Include="mscorlib" />
   </ItemGroup>
 

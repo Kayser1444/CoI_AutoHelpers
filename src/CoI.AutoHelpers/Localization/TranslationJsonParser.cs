@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Web.Script.Serialization;
 
 namespace CoI.AutoHelpers.Localization
 {
@@ -69,28 +68,8 @@ namespace CoI.AutoHelpers.Localization
                 throw new ArgumentNullException(nameof(jsonText));
             }
 
-            object rootValue;
-
-            try
+            if (!TryParseRootArrayOfTupleItems(sourcePath, jsonText, diagnostics, out List<object> parsedItems))
             {
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                rootValue = serializer.DeserializeObject(jsonText);
-            }
-            catch (Exception ex)
-            {
-                diagnostics.Add(new TranslationDiagnostic(
-                    TranslationDiagnosticSeverity.Error,
-                    sourcePath,
-                    $"Invalid JSON: {ex.Message}"));
-                return new TranslationBundle(localeCode, Array.Empty<TranslationEntry>());
-            }
-
-            if (!(rootValue is IEnumerable rootEnumerable) || rootValue is string)
-            {
-                diagnostics.Add(new TranslationDiagnostic(
-                    TranslationDiagnosticSeverity.Error,
-                    sourcePath,
-                    "Root JSON value must be an array of translation tuples."));
                 return new TranslationBundle(localeCode, Array.Empty<TranslationEntry>());
             }
 
@@ -98,7 +77,7 @@ namespace CoI.AutoHelpers.Localization
             Dictionary<string, int> indexByKey = new Dictionary<string, int>(StringComparer.Ordinal);
 
             int itemIndex = 0;
-            foreach (object item in rootEnumerable)
+            foreach (object item in parsedItems)
             {
                 itemIndex += 1;
 
@@ -288,6 +267,290 @@ namespace CoI.AutoHelpers.Localization
 
             entry = new TranslationEntry(key, singular, plural);
             return true;
+        }
+
+        private static bool TryParseRootArrayOfTupleItems(
+            string sourcePath,
+            string jsonText,
+            IList<TranslationDiagnostic> diagnostics,
+            out List<object> parsedItems)
+        {
+            parsedItems = new List<object>();
+            JsonTupleArrayParser parser = new JsonTupleArrayParser(jsonText);
+            if (parser.TryParse(out List<List<string>> tuples, out string? error))
+            {
+                foreach (List<string> tuple in tuples)
+                {
+                    parsedItems.Add(tuple);
+                }
+
+                return true;
+            }
+
+            diagnostics.Add(new TranslationDiagnostic(
+                TranslationDiagnosticSeverity.Error,
+                sourcePath,
+                error ?? "Invalid JSON."));
+            return false;
+        }
+
+        private sealed class JsonTupleArrayParser
+        {
+            private readonly string m_text;
+            private int m_index;
+
+            public JsonTupleArrayParser(string text)
+            {
+                m_text = text ?? string.Empty;
+                m_index = 0;
+            }
+
+            public bool TryParse(out List<List<string>> tuples, out string? error)
+            {
+                tuples = new List<List<string>>();
+                error = null;
+
+                SkipWhitespace();
+                if (!TryConsume('['))
+                {
+                    error = BuildError("Root JSON value must be an array of translation tuples.");
+                    return false;
+                }
+
+                SkipWhitespace();
+                if (TryConsume(']'))
+                {
+                    SkipWhitespace();
+                    return EnsureEndOfInput(out error);
+                }
+
+                while (true)
+                {
+                    if (!TryReadTuple(out List<string>? tuple, out error))
+                    {
+                        return false;
+                    }
+
+                    tuples.Add(tuple ?? new List<string>());
+                    SkipWhitespace();
+
+                    if (TryConsume(']'))
+                    {
+                        break;
+                    }
+
+                    if (!TryConsume(','))
+                    {
+                        error = BuildError("Expected ',' or ']' after a translation tuple.");
+                        return false;
+                    }
+
+                    SkipWhitespace();
+                }
+
+                SkipWhitespace();
+                return EnsureEndOfInput(out error);
+            }
+
+            private bool TryReadTuple(out List<string>? tuple, out string? error)
+            {
+                tuple = null;
+                error = null;
+
+                SkipWhitespace();
+                if (!TryConsume('['))
+                {
+                    error = BuildError("Each translation item must be an array of string values.");
+                    return false;
+                }
+
+                tuple = new List<string>();
+                SkipWhitespace();
+
+                if (TryConsume(']'))
+                {
+                    return true;
+                }
+
+                while (true)
+                {
+                    if (!TryReadString(out string? value, out error))
+                    {
+                        return false;
+                    }
+
+                    tuple.Add(value ?? string.Empty);
+                    SkipWhitespace();
+
+                    if (TryConsume(']'))
+                    {
+                        return true;
+                    }
+
+                    if (!TryConsume(','))
+                    {
+                        error = BuildError("Expected ',' or ']' within a translation tuple.");
+                        return false;
+                    }
+
+                    SkipWhitespace();
+                }
+            }
+
+            private bool TryReadString(out string? value, out string? error)
+            {
+                value = null;
+                error = null;
+
+                if (!TryConsume('"'))
+                {
+                    error = BuildError("Translation item values must be JSON strings.");
+                    return false;
+                }
+
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+                while (!IsAtEnd)
+                {
+                    char c = ReadChar();
+                    if (c == '"')
+                    {
+                        value = sb.ToString();
+                        return true;
+                    }
+
+                    if (c != '\\')
+                    {
+                        sb.Append(c);
+                        continue;
+                    }
+
+                    if (IsAtEnd)
+                    {
+                        error = BuildError("Unexpected end of input after escape character.");
+                        return false;
+                    }
+
+                    char escape = ReadChar();
+                    switch (escape)
+                    {
+                        case '"': sb.Append('"'); break;
+                        case '\\': sb.Append('\\'); break;
+                        case '/': sb.Append('/'); break;
+                        case 'b': sb.Append('\b'); break;
+                        case 'f': sb.Append('\f'); break;
+                        case 'n': sb.Append('\n'); break;
+                        case 'r': sb.Append('\r'); break;
+                        case 't': sb.Append('\t'); break;
+                        case 'u':
+                            if (!TryReadUnicodeEscape(out char unicodeChar, out error))
+                            {
+                                return false;
+                            }
+
+                            sb.Append(unicodeChar);
+                            break;
+                        default:
+                            error = BuildError($"Unsupported escape sequence '\\{escape}'.");
+                            return false;
+                    }
+                }
+
+                error = BuildError("Unterminated JSON string.");
+                return false;
+            }
+
+            private bool TryReadUnicodeEscape(out char value, out string? error)
+            {
+                value = default(char);
+                error = null;
+
+                if (m_index + 4 > m_text.Length)
+                {
+                    error = BuildError("Incomplete unicode escape sequence.");
+                    return false;
+                }
+
+                int codePoint = 0;
+                for (int i = 0; i < 4; i++)
+                {
+                    char hex = ReadChar();
+                    int nibble;
+                    if (hex >= '0' && hex <= '9')
+                    {
+                        nibble = hex - '0';
+                    }
+                    else if (hex >= 'a' && hex <= 'f')
+                    {
+                        nibble = 10 + (hex - 'a');
+                    }
+                    else if (hex >= 'A' && hex <= 'F')
+                    {
+                        nibble = 10 + (hex - 'A');
+                    }
+                    else
+                    {
+                        error = BuildError("Invalid unicode escape sequence.");
+                        return false;
+                    }
+
+                    codePoint = (codePoint << 4) | nibble;
+                }
+
+                value = (char)codePoint;
+                return true;
+            }
+
+            private bool EnsureEndOfInput(out string? error)
+            {
+                error = null;
+                if (IsAtEnd)
+                {
+                    return true;
+                }
+
+                error = BuildError("Unexpected trailing content after root JSON array.");
+                return false;
+            }
+
+            private bool TryConsume(char expected)
+            {
+                if (IsAtEnd || m_text[m_index] != expected)
+                {
+                    return false;
+                }
+
+                m_index += 1;
+                return true;
+            }
+
+            private void SkipWhitespace()
+            {
+                while (!IsAtEnd)
+                {
+                    char c = m_text[m_index];
+                    if (!char.IsWhiteSpace(c))
+                    {
+                        break;
+                    }
+
+                    m_index += 1;
+                }
+            }
+
+            private char ReadChar()
+            {
+                char c = m_text[m_index];
+                m_index += 1;
+                return c;
+            }
+
+            private bool IsAtEnd => m_index >= m_text.Length;
+
+            private string BuildError(string message)
+            {
+                return $"Invalid JSON at character index {m_index}: {message}";
+            }
         }
     }
 }
