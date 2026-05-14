@@ -7,92 +7,173 @@ logging patterns that ATD and AFD previously duplicated in each mod.
 
 ### `ModLogger`
 
-A thin prefix-scoped wrapper over `Mafi.Log`. Constructed with a short mod tag
-(`"ATD"`, `"AFD"`, etc.) and prefixes every outgoing message with `[TAG] ` so
-log lines are immediately attributable in both the Mafi log file and the Unity
-console.
+A prefix-scoped wrapper over `Mafi.Log` that carries full mod identity so all
+setup helpers require zero repeated arguments. Construct once as an instance
+field after the manifest version is available, then call the setup helpers in
+`Initialize`.
 
 ```csharp
-private static readonly ModLogger Log = new ModLogger("ATD");
-Log.Info("Starting mod initialization.");
-Log.Warning($"Setting value {v} out of range; clamping.");
-Log.Exception(ex, "ticker update");
+// In mod class:
+private readonly ModLogger m_log;
+
+// In mod constructor (after ModVersion is set from manifest):
+m_log = new ModLogger("AFD", "AutoForestryDesignations", ModVersion, typeof(AutoForestryDesignationsMod).Assembly);
+
+// In IMod.Initialize:
+m_log.EnableConsoleLogging();   // must come first so the banner is captured
+m_log.RegisterAutoConsoleMirroring(
+    this,
+    resolver.Resolve<IGameLoopEvents>(),
+    resolver.Resolve<GameConsoleCommandsExecutor>());
+
+// Ordinary logging:
+m_log.Info("Starting scan.");
+m_log.Warning($"Setting value {v} out of range; clamping.");
+m_log.Exception(ex, "ticker update");
 ```
 
-**`LogStartupBanner(string modId, string manifestVersion, Assembly modAssembly)`**
+**Constructor parameters**
+
+| Parameter | Example | Purpose |
+|---|---|---|
+| `modTag` | `"AFD"` | Short identifier; wrapped in brackets for every log line: `[AFD] ` |
+| `modId` | `"AutoForestryDesignations"` | Human-readable name; used in the startup banner |
+| `manifestVersion` | `manifest.Version.ToString()` | Version string; used in the startup banner |
+| `modAssembly` | `typeof(MyMod).Assembly` | Used to read the DLL build timestamp |
+
+**`LogStartupBanner()`**
 
 Emits a single identifiable line at the start of each game session:
 
 ```
-[ATD] AutoTerrainDesignations v0.4.0 | dll: 2026-05-14 16:30:00 UTC
+[AFD] AutoForestryDesignations v0.3.0 | dll: 2026-05-14 16:30:00 UTC
 ```
 
-The DLL build timestamp is read from the file system (`File.GetLastWriteTimeUtc`).
-If the path is unavailable the field shows `<unknown>`.
+The DLL build timestamp is resolved in the following order:
+1. `AssemblyMetadataAttribute("BuildTimestamp")` — compile-time embedded (primary; reliable regardless of how the mod loader loads the assembly)
+2. `assembly.Location` file last-write time
+3. `assembly.ManifestModule.FullyQualifiedName` file last-write time
+4. `new Uri(assembly.CodeBase).LocalPath` file last-write time
+5. Assembly version string (`asm-ver:1.0.0.0`)
+6. `<unknown>`
+
+Embed the attribute via MSBuild in the consuming mod's `.csproj` so option 1 always fires:
+
+```xml
+<ItemGroup>
+  <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+    <_Parameter1>BuildTimestamp</_Parameter1>
+    <_Parameter2>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter2>
+  </AssemblyAttribute>
+</ItemGroup>
+```
+
+**`RegisterAutoConsoleMirroring(owner, gameLoopEvents, consoleCommands)`**
+
+Defers the startup banner (and, in Debug builds, `also_log_to_console true`) to
+the renderer-init game loop state. This ensures:
+- The banner appears in the in-game CoI console (which only captures lines
+  emitted after `also_log_to_console` fires).
+- The sequence is reliable even in Release builds — the banner is always emitted.
+
+Call `EnableConsoleLogging()` before this so the `Log.LogReceived` subscriber is
+active when the banner fires.
 
 ---
 
 ### `ModConsoleLogger`
 
 Subscribes to `Mafi.Log.LogReceived` and forwards matching entries to
-`UnityEngine.Debug.*` so they appear in the Unity/game console during development.
-All methods are `[Conditional("DEBUG")]` — they compile away to nothing in
-Release builds at the call site.
+`UnityEngine.Debug.*` so they appear in the Unity console during development.
+All public methods are `[Conditional("DEBUG")]` — they compile away to nothing
+in Release builds at every call site.
 
-The constructor filter string is the same tag used by `ModLogger` (e.g. `"[ATD]"`).
-Only lines containing the filter are forwarded; unrelated log noise is ignored.
+Lines are forwarded only when they contain the filter tag (e.g. `"[AFD]"`);
+unrelated log noise is ignored.
 
-```csharp
-// In IMod.Initialize:
-ModConsoleLogger.Enable("[ATD]");
-```
+Format: `[INF] 14:35:02 ~Uni: [AFD] message`
 
-Log entry format mirrors the existing ATD/AFD ConsoleLogger format:
-`[INF] 14:35:02 ~Uni: [ATD] message`
+`ModLogger.EnableConsoleLogging()` is the preferred way to activate it; the
+static `ModConsoleLogger.Enable(string logFilter)` / `Disable(string logFilter)`
+methods remain public for direct use.
 
 ---
 
 ### `ModDebugHelpers`
 
-Auto-registers the `also_log_to_console true` game console command at renderer
-init so the in-game console mirrors log output without a manual command each
-launch. Both ATD and AFD had this wired independently; it is now in one place.
+Standalone Debug-only helper for auto-registering `also_log_to_console`.
+`ModLogger.RegisterAutoConsoleMirroring` inlines this logic directly; `ModDebugHelpers`
+remains public for mods that want the console-mirroring registration without
+constructing a full `ModLogger`.
 
-All methods are `[Conditional("DEBUG")]`.
+---
+
+## Consuming mod setup
+
+### 1. Add the Logging source glob to the mod's `.csproj`
+
+```xml
+<Compile Include="external\CoI_AutoHelpers\src\CoI.AutoHelpers\Logging\**\*.cs"
+         Link="CoI.AutoHelpers\Logging\%(RecursiveDir)%(Filename)%(Extension)" />
+```
+
+### 2. Embed the build timestamp
+
+```xml
+<ItemGroup>
+  <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+    <_Parameter1>BuildTimestamp</_Parameter1>
+    <_Parameter2>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter2>
+  </AssemblyAttribute>
+</ItemGroup>
+```
+
+### 3. Wire up in the mod class
 
 ```csharp
-// In IMod.Initialize (injecting dependencies from resolver):
-ModDebugHelpers.RegisterAutoConsoleMirroring(
-    this,
-    resolver.Resolve<IGameLoopEvents>(),
-    resolver.Resolve<GameConsoleCommandsExecutor>(),
-    "[ATD]");
+private readonly ModLogger m_log;
+
+public MyMod(ModManifest manifest)
+{
+    Manifest = manifest;
+    ModVersion = manifest.Version.ToString();
+    m_log = new ModLogger("TAG", "MyModName", ModVersion, typeof(MyMod).Assembly);
+}
+
+public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
+{
+    m_log.EnableConsoleLogging();
+    m_log.RegisterAutoConsoleMirroring(
+        this,
+        resolver.Resolve<IGameLoopEvents>(),
+        resolver.Resolve<GameConsoleCommandsExecutor>());
+    // ...
+}
 ```
 
 ---
 
-## Migration path for existing mods
-
-ATD and AFD each have their own hand-rolled `ConsoleLogger.cs`. Once the mod is
-ready to migrate:
+## Migration path from per-mod ConsoleLogger
 
 1. Delete the per-mod `ConsoleLogger.cs`.
-2. Replace `ConsoleLogger.Enable()` with `ModConsoleLogger.Enable("[TAG]")`.
-3. Replace the inline `#if DEBUG ... RegisterRendererInitState ...` block with
-   `ModDebugHelpers.RegisterAutoConsoleMirroring(...)`.
-4. Optionally replace direct `Log.Info("[TAG] ...")` calls with a `ModLogger`
-   instance — this is a convenience migration, not a requirement.
-5. Add `LogStartupBanner(...)` in `IMod.Initialize` to emit a version header.
+2. Add `private readonly ModLogger m_log` to the mod class; construct it in the
+   mod constructor after `ModVersion` is set.
+3. Replace `ConsoleLogger.Enable()` → `m_log.EnableConsoleLogging()`.
+4. Replace the inline `#if DEBUG ... RegisterRendererInitState(also_log_to_console) ...`
+   block (and any standalone `LogStartupBanner` call) → `m_log.RegisterAutoConsoleMirroring(...)`.
+5. Replace direct `Log.Info("[TAG] ...")` calls → `m_log.Info(...)`.
+6. Add the Logging glob and `BuildTimestamp` attribute to the `.csproj` (see above).
 
-The mods are **not required to migrate**; both approaches compile and run
-correctly. Migration is recommended when touching a file for other reasons.
+AFD completed this migration in May 2026. ATD migration is pending.
+
+---
 
 ## Ownership and file layout
 
 ```
 src/CoI.AutoHelpers/Logging/
-    ModLogger.cs           — prefix wrapper + startup banner
-    ModConsoleLogger.cs    — debug-only LogReceived subscriber
+    ModLogger.cs           — prefix wrapper, startup banner, setup helpers
+    ModConsoleLogger.cs    — debug-only Log.LogReceived subscriber
     ModDebugHelpers.cs     — debug-only also_log_to_console auto-registration
 ```
 
