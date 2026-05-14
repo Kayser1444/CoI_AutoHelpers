@@ -7,89 +7,97 @@ logging patterns that ATD and AFD previously duplicated in each mod.
 
 ### `ModLogger`
 
-A prefix-scoped wrapper over `Mafi.Log` that carries full mod identity so all
-setup helpers require zero repeated arguments. Construct once as an instance
-field after the manifest version is available, then call the setup helpers in
-`Initialize`.
+A prefix-scoped wrapper over `Mafi.Log`. Construct once as an `internal static
+readonly` field on the mod's main logic class so all partial-class files share
+it without cross-class references.
+
+**Constructor**
 
 ```csharp
-// In mod class:
-private readonly ModLogger m_log;
+internal static readonly ModLogger s_log = new ModLogger("AFD");
+```
 
-// In mod constructor (after ModVersion is set from manifest):
-m_log = new ModLogger("AFD", "AutoForestryDesignations", ModVersion, typeof(AutoForestryDesignationsMod).Assembly);
+`modTag` is the only parameter. It is wrapped in brackets for every log line:
+`[AFD] `.
 
-// In IMod.Initialize:
-m_log.EnableConsoleLogging();   // must come first so the banner is captured
-m_log.RegisterAutoConsoleMirroring(
+**Why `static readonly` on the logic class, not the `IMod` entry point**
+
+`static readonly` field initializers run when the type is first accessed, which
+for the `IMod` class happens before the instance constructor sets `ModVersion`.
+Placing `s_log` on the main logic class (e.g. `AutoForestryDesignation`) defers
+initialization to the first access in `RegisterPrototypes`, by which time
+`ModVersion` is already set. Because the constructor now takes only the tag
+there is nothing version-dependent captured at construction time, but the
+location convention is consistent across ATD and AFD.
+
+**Logging**
+
+```csharp
+AutoForestryDesignation.s_log.Info("Starting scan.");
+AutoForestryDesignation.s_log.Warning($"Setting value {v} out of range; clamping.");
+AutoForestryDesignation.s_log.Exception(ex, "ticker update");
+AutoForestryDesignation.s_log.Error("Fatal: could not resolve designation manager.");
+```
+
+All methods prepend `[AFD] ` to the message before calling `Mafi.Log`.
+
+**`EnableConsoleLogging()`**
+
+`[Conditional("DEBUG")]`. Activates `ModConsoleLogger` for this mod's filter
+tag. Call in `IMod.Initialize` before any logging.
+
+**`RegisterAutoConsoleMirroring(owner, gameLoopEvents, consoleCommands)`**
+
+Registers a renderer-init callback that (in Debug builds) executes the
+`also_log_to_console true` in-game console command.
+
+`also_log_to_console` is a **pure toggle** in CoI — calling it twice (once per
+mod when multiple mods load) flips console logging back off. The method uses
+`AppDomain.CurrentDomain.SetData` as a process-wide one-shot flag: only the
+first mod to run its renderer-init callback fires the command; all subsequent
+mods skip it.
+
+The startup banner is **not** emitted by this method. Each mod announces its own
+version and DLL timestamp in its own renderer-init callback:
+
+```csharp
+// In Initialize:
+AutoForestryDesignation.s_log.EnableConsoleLogging();
+AutoForestryDesignation.s_log.RegisterAutoConsoleMirroring(
     this,
     resolver.Resolve<IGameLoopEvents>(),
     resolver.Resolve<GameConsoleCommandsExecutor>());
 
-// Ordinary logging:
-m_log.Info("Starting scan.");
-m_log.Warning($"Setting value {v} out of range; clamping.");
-m_log.Exception(ex, "ticker update");
+// In RegisterRendererInitState callback:
+AutoForestryDesignation.s_log.Info(
+    $"AutoForestryDesignations v{ModVersion} | dll: {ModLogger.GetDllBuildTimestamp(typeof(AutoForestryDesignationsMod).Assembly)}");
 ```
 
-**Constructor parameters**
+**`GetDllBuildTimestamp(Assembly assembly)`** — `public static`
 
-| Parameter | Example | Purpose |
-|---|---|---|
-| `modTag` | `"AFD"` | Short identifier; wrapped in brackets for every log line: `[AFD] ` |
-| `modId` | `"AutoForestryDesignations"` | Human-readable name; used in the startup banner |
-| `manifestVersion` | `manifest.Version.ToString()` | Version string; used in the startup banner |
-| `modAssembly` | `typeof(MyMod).Assembly` | Used to read the DLL build timestamp |
+Returns a human-readable build timestamp for the given assembly. The timestamp
+is in local time and reported without a timezone suffix. Resolution order:
 
-**`LogStartupBanner()`**
-
-Emits a single identifiable line at the start of each game session:
-
-```
-[AFD] AutoForestryDesignations v0.3.0 | dll: 2026-05-14 16:30:00 UTC
-```
-
-The banner serves two purposes in the development workflow:
-
-- **Log analysis**: every Mafi log file starts with the banner, so when a player
-  or developer shares a log the build date is immediately visible without
-  opening the file in a debugger.
-- **Build verification**: when testing a fix, the timestamp confirms that the
-  deployed DLL is actually the freshly compiled one and not a stale copy from a
-  previous run or a CI artifact.
-
-The DLL build timestamp is resolved in the following order:
-1. `AssemblyMetadataAttribute("BuildTimestamp")` — compile-time embedded (primary; reliable regardless of how the mod loader loads the assembly)
-2. `assembly.Location` file last-write time
-3. `assembly.ManifestModule.FullyQualifiedName` file last-write time
-4. `new Uri(assembly.CodeBase).LocalPath` file last-write time
+1. `AssemblyMetadataAttribute("BuildTimestamp")` — compile-time embedded (primary; reliable regardless of how CoI loads the assembly)
+2. `assembly.Location` file last-write time (local)
+3. `assembly.ManifestModule.FullyQualifiedName` file last-write time (local)
+4. `new Uri(assembly.CodeBase).LocalPath` file last-write time (local)
 5. Assembly version string (`asm-ver:1.0.0.0`)
 6. `<unknown>`
 
 Option 1 is the only reliable source because CoI loads mod assemblies from byte
 arrays rather than from disk paths, making `assembly.Location` and related
-properties empty at runtime. Embed the attribute via MSBuild in the consuming
-mod's `.csproj` so option 1 always fires:
+properties empty at runtime. Embed the attribute in each consuming mod's
+`.csproj`:
 
 ```xml
 <ItemGroup>
   <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
     <_Parameter1>BuildTimestamp</_Parameter1>
-    <_Parameter2>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter2>
+    <_Parameter2>$([System.DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter2>
   </AssemblyAttribute>
 </ItemGroup>
 ```
-
-**`RegisterAutoConsoleMirroring(owner, gameLoopEvents, consoleCommands)`**
-
-Defers the startup banner (and, in Debug builds, `also_log_to_console true`) to
-the renderer-init game loop state. This ensures:
-- The banner appears in the in-game CoI console (which only captures lines
-  emitted after `also_log_to_console` fires).
-- The sequence is reliable even in Release builds — the banner is always emitted.
-
-Call `EnableConsoleLogging()` before this so the `Log.LogReceived` subscriber is
-active when the banner fires.
 
 ---
 
@@ -97,109 +105,22 @@ active when the banner fires.
 
 Subscribes to `Mafi.Log.LogReceived` and forwards matching entries to
 `UnityEngine.Debug.*` so they appear in the Unity console during development.
-All public methods are `[Conditional("DEBUG")]` — they compile away to nothing
-in Release builds at every call site.
+All public methods are `[Conditional("DEBUG")]` — they compile away in Release.
 
 Lines are forwarded only when they contain the filter tag (e.g. `"[AFD]"`);
 unrelated log noise is ignored.
 
 Format: `[INF] 14:35:02 ~Uni: [AFD] message`
 
-`ModLogger.EnableConsoleLogging()` is the preferred way to activate it; the
-static `ModConsoleLogger.Enable(string logFilter)` / `Disable(string logFilter)`
-methods remain public for direct use.
+`ModLogger.EnableConsoleLogging()` is the preferred entry point. The static
+`ModConsoleLogger.Enable(string logFilter)` / `Disable(string logFilter)` methods
+remain public for direct use if a `ModLogger` instance is not available.
 
 ---
 
 ### `ModDebugHelpers`
 
-Standalone Debug-only helper for auto-registering `also_log_to_console`.
-`ModLogger.RegisterAutoConsoleMirroring` inlines this logic directly; `ModDebugHelpers`
-remains public for mods that want the console-mirroring registration without
-constructing a full `ModLogger`.
-
----
-
-## Consuming mod setup
-
-### 1. Add the Logging source glob to the mod's `.csproj`
-
-```xml
-<Compile Include="external\CoI_AutoHelpers\src\CoI.AutoHelpers\Logging\**\*.cs"
-         Link="CoI.AutoHelpers\Logging\%(RecursiveDir)%(Filename)%(Extension)" />
-```
-
-### 2. Embed the build timestamp
-
-The timestamp is baked into the DLL at compile time via an MSBuild property
-function. It serves as a quick sanity-check in the startup banner — confirming
-that the deployed DLL is the freshly compiled one and that no stale copy from a
-previous build is being picked up.
-
-```xml
-<ItemGroup>
-  <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-    <_Parameter1>BuildTimestamp</_Parameter1>
-    <_Parameter2>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))</_Parameter2>
-  </AssemblyAttribute>
-</ItemGroup>
-```
-
-The MSBuild property function `$([System.DateTime]::UtcNow.ToString(...))` is
-evaluated once at the start of each build, so the value reflects the compile
-time rather than any file-system last-write time. This is necessary because
-CoI loads mod assemblies from byte arrays at runtime, making
-`assembly.Location` and similar path-based APIs unavailable.
-
-### 3. Wire up in the mod class
-
-```csharp
-private readonly ModLogger m_log;
-
-public MyMod(ModManifest manifest)
-{
-    Manifest = manifest;
-    ModVersion = manifest.Version.ToString();
-    m_log = new ModLogger("TAG", "MyModName", ModVersion, typeof(MyMod).Assembly);
-}
-
-public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
-{
-    m_log.EnableConsoleLogging();
-    m_log.RegisterAutoConsoleMirroring(
-        this,
-        resolver.Resolve<IGameLoopEvents>(),
-        resolver.Resolve<GameConsoleCommandsExecutor>());
-    // ...
-}
-```
-
----
-
-## Migration path from per-mod ConsoleLogger
-
-1. Delete the per-mod `ConsoleLogger.cs`.
-2. Add `private readonly ModLogger m_log` to the mod class; construct it in the
-   mod constructor after `ModVersion` is set.
-3. Replace `ConsoleLogger.Enable()` → `m_log.EnableConsoleLogging()`.
-4. Replace the inline `#if DEBUG ... RegisterRendererInitState(also_log_to_console) ...`
-   block (and any standalone `LogStartupBanner` call) → `m_log.RegisterAutoConsoleMirroring(...)`.
-5. Replace direct `Log.Info("[TAG] ...")` calls → `m_log.Info(...)`.
-6. Add the Logging glob and `BuildTimestamp` attribute to the `.csproj` (see above).
-
-AFD completed this migration in May 2026. ATD migration is pending.
-
----
-
-## Ownership and file layout
-
-```
-src/CoI.AutoHelpers/Logging/
-    ModLogger.cs           — prefix wrapper, startup banner, setup helpers
-    ModConsoleLogger.cs    — debug-only Log.LogReceived subscriber
-    ModDebugHelpers.cs     — debug-only also_log_to_console auto-registration
-```
-
-The `CoI.AutoHelpers.csproj` standalone build compiles `Logging/**/*.cs` alongside
-`Localization/**/*.cs` and references `Mafi.dll`, `Mafi.Core.dll`, and
-`UnityEngine.CoreModule.dll` for type-checking.
+Standalone Debug-only helper. `ModLogger.RegisterAutoConsoleMirroring` inlines
+the same `AppDomain` guard and `also_log_to_console` logic directly;
+`ModDebugHelpers` remains public for mods that want that behavior without
+constructing a `ModLogger`.
