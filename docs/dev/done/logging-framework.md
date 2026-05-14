@@ -49,6 +49,15 @@ Emits a single identifiable line at the start of each game session:
 [AFD] AutoForestryDesignations v0.3.0 | dll: 2026-05-14 16:30:00 UTC
 ```
 
+The banner serves two purposes in the development workflow:
+
+- **Log analysis**: every Mafi log file starts with the banner, so when a player
+  or developer shares a log the build date is immediately visible without
+  opening the file in a debugger.
+- **Build verification**: when testing a fix, the timestamp confirms that the
+  deployed DLL is actually the freshly compiled one and not a stale copy from a
+  previous run or a CI artifact.
+
 The DLL build timestamp is resolved in the following order:
 1. `AssemblyMetadataAttribute("BuildTimestamp")` — compile-time embedded (primary; reliable regardless of how the mod loader loads the assembly)
 2. `assembly.Location` file last-write time
@@ -57,7 +66,10 @@ The DLL build timestamp is resolved in the following order:
 5. Assembly version string (`asm-ver:1.0.0.0`)
 6. `<unknown>`
 
-Embed the attribute via MSBuild in the consuming mod's `.csproj` so option 1 always fires:
+Option 1 is the only reliable source because CoI loads mod assemblies from byte
+arrays rather than from disk paths, making `assembly.Location` and related
+properties empty at runtime. Embed the attribute via MSBuild in the consuming
+mod's `.csproj` so option 1 always fires:
 
 ```xml
 <ItemGroup>
@@ -119,6 +131,11 @@ constructing a full `ModLogger`.
 
 ### 2. Embed the build timestamp
 
+The timestamp is baked into the DLL at compile time via an MSBuild property
+function. It serves as a quick sanity-check in the startup banner — confirming
+that the deployed DLL is the freshly compiled one and that no stale copy from a
+previous build is being picked up.
+
 ```xml
 <ItemGroup>
   <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
@@ -127,6 +144,12 @@ constructing a full `ModLogger`.
   </AssemblyAttribute>
 </ItemGroup>
 ```
+
+The MSBuild property function `$([System.DateTime]::UtcNow.ToString(...))` is
+evaluated once at the start of each build, so the value reflects the compile
+time rather than any file-system last-write time. This is necessary because
+CoI loads mod assemblies from byte arrays at runtime, making
+`assembly.Location` and similar path-based APIs unavailable.
 
 ### 3. Wire up in the mod class
 
