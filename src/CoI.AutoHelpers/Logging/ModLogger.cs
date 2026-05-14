@@ -114,8 +114,20 @@ namespace CoI.AutoHelpers.Logging
 
         private static string GetDllBuildTimestamp(Assembly assembly)
         {
-            // Try several path sources in order — Assembly.Location can be empty when the
-            // CoI mod loader uses shadow-copying or loads from a byte array.
+            // First preference: attribute embedded at compile time via AssemblyMetadata.
+            // Reliable regardless of how the mod loader loads the assembly (byte-array load,
+            // shadow copy, etc.).
+            try
+            {
+                foreach (AssemblyMetadataAttribute attr in assembly.GetCustomAttributes(typeof(AssemblyMetadataAttribute), false))
+                {
+                    if (attr.Key == "BuildTimestamp" && !string.IsNullOrEmpty(attr.Value))
+                        return attr.Value + " UTC";
+                }
+            }
+            catch { }
+
+            // Fallback: try to read file last-write time from whatever path the runtime exposes.
             string? path = TryResolveDllPath(assembly);
             if (path != null)
             {
