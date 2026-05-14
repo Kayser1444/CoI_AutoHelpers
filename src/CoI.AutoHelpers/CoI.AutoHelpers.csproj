@@ -17,16 +17,31 @@ released Captain of Industry mods should still consume the helper as source.
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <CaptainIndustryManagedPath Condition="'$(CaptainIndustryManagedPath)' == '' and '$(CAPTAIN_INDUSTRY_MANAGED_PATH)' != ''">$(CAPTAIN_INDUSTRY_MANAGED_PATH)</CaptainIndustryManagedPath>
+    <CaptainIndustryManagedPath Condition="'$(CaptainIndustryManagedPath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Captain of Industry\Captain of Industry_Data\Managed</CaptainIndustryManagedPath>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="Localization\**\*.cs" />
+    <Compile Include="Logging\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="mscorlib" />
+    <Reference Include="Mafi">
+      <HintPath>$(CaptainIndustryManagedPath)\Mafi.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Mafi.Core">
+      <HintPath>$(CaptainIndustryManagedPath)\Mafi.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(CaptainIndustryManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

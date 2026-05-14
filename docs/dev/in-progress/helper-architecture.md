@@ -6,12 +6,12 @@ CoI AutoHelpers is intended to become a reusable source-level infrastructure lay
 
 The helper should provide:
 
-- structured localization
+- structured localization ✓
+- consistent logging and diagnostics ✓
 - attribute-driven metadata
 - reusable settings infrastructure
 - console command helpers
 - persistence helpers
-- consistent logging and diagnostics
 
 without introducing runtime DLL dependencies.
 

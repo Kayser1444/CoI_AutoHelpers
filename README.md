@@ -41,24 +41,17 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 ## Documentation
 
-- [Source-submodule and VS Code workspace approach](docs/source-submodule-workflow.md)
-- [Helper architecture](docs/helper-architecture.md)
-- [Localization framework build plan](docs/localization-framework-build-plan.md)
-- [Mod integration example](docs/mod-integration-example.md)
-- [Backlog](BACKLOG.md)
+- [Helper development docs](docs/dev/README.md)
+- [Modder docs](docs/modders/README.md)
+- [Backlog topics](docs/dev/planned/README.md)
 - [Changelog](CHANGELOG.md)
 
 ## Current scope
 
-### Active
+### Implemented
 
-- Localization architecture
-- Translation file layout
-- Early translation loading strategy
-- Static `LocStr` rebind strategy
-- Initial `ModTranslations` apply pipeline (load -> select locale -> splice -> rebind)
-- Explicit deferred UI refresh queue for targeted late-bound text updates
-- Deterministic English template export service with prefix and TODO/HIDE filters
+- Localization: `ModTranslations` apply pipeline (load → select locale → splice → rebind), deferred UI refresh queue, deterministic English template exporter
+- Logging: `ModLogger` (prefix wrapper + startup banner), `ModConsoleLogger` (debug-only `Log.LogReceived` mirror), `ModDebugHelpers` (debug-only `also_log_to_console` auto-registration)
 
 ### Planned placeholders
 
@@ -66,7 +59,6 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 - Global settings helpers
 - Console command helpers
 - Save persistence helpers
-- Common logging/version helpers
 
 ## Design principles
 
@@ -79,4 +71,4 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 ## Repository status
 
-Bootstrap stage. Localization data model, runtime contracts, and a buildable helper project scaffold have been added, but there is no stable public API yet.
+Early development. Localization and logging subsystems are implemented and consumed by ATD and AFD. No stable public API yet.

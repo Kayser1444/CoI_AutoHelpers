@@ -8,6 +8,9 @@ The project is currently pre-release and unstable.
 
 ### Added
 
+- Logging subsystem: `ModLogger` (prefix wrapper over `Mafi.Log` with startup banner), `ModConsoleLogger` (debug-only `Log.LogReceived` subscriber), `ModDebugHelpers` (debug-only `also_log_to_console` auto-registration)
+- `CoI.AutoHelpers.csproj` now references `Mafi`, `Mafi.Core`, and `UnityEngine.CoreModule` for Logging type resolution
+
 - Initial repository bootstrap
 - Source-submodule workflow documentation
 - VS Code workspace guidance
