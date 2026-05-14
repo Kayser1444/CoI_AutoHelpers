@@ -90,12 +90,27 @@ namespace CoI.AutoHelpers.Logging
         }
 
         /// <summary>
-        /// Registers a renderer-init callback that auto-executes <c>also_log_to_console true</c>.
-        /// No-op in Release builds.
+        /// Registers a renderer-init callback that emits the startup banner and
+        /// (in Debug builds) auto-executes <c>also_log_to_console true</c> so the
+        /// banner appears in the in-game console.
+        ///
+        /// In Release builds the banner is still emitted at renderer-init — after
+        /// the game has fully initialised — rather than during <c>Initialize</c>.
         /// </summary>
-        [System.Diagnostics.Conditional("DEBUG")]
         public void RegisterAutoConsoleMirroring(object owner, IGameLoopEvents gameLoopEvents, GameConsoleCommandsExecutor consoleCommands)
-            => ModDebugHelpers.RegisterAutoConsoleMirroring(owner, gameLoopEvents, consoleCommands, m_filterTag);
+        {
+            gameLoopEvents.RegisterRendererInitState(owner, () =>
+            {
+#if DEBUG
+                bool enabled = consoleCommands.ExecuteOrSchedule("also_log_to_console true");
+                if (enabled)
+                    UnityEngine.Debug.Log($"{m_filterTag} Debug build: auto-executed also_log_to_console.");
+                else
+                    UnityEngine.Debug.LogWarning($"{m_filterTag} Debug build: failed to auto-execute also_log_to_console.");
+#endif
+                LogStartupBanner();
+            });
+        }
 
         private static string GetDllBuildTimestamp(Assembly assembly)
         {
