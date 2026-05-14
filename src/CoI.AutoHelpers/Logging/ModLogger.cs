@@ -2,37 +2,60 @@ using System;
 using System.IO;
 using System.Reflection;
 using Mafi;
+using Mafi.Core.Console;
+using Mafi.Core.GameLoop;
 
 namespace CoI.AutoHelpers.Logging
 {
     /// <summary>
-    /// A thin, prefix-scoped wrapper over the Mafi <see cref="Log"/> API.
+    /// A prefix-scoped wrapper over the Mafi <see cref="Log"/> API that also carries
+    /// mod identity (id, version, assembly) so that console-logging setup, the startup
+    /// banner, and debug console-mirroring registration require no repeated arguments.
     ///
-    /// Every message is prefixed with the mod tag so log lines are immediately
-    /// attributable in the Mafi log file and Unity console alike.
-    ///
-    /// Usage:
+    /// Construct once in <c>IMod</c>'s instance constructor (after the manifest version
+    /// is available), then call the setup helpers in <c>Initialize</c>:
     /// <code>
-    /// private static readonly ModLogger Log = new ModLogger("ATD");
-    /// Log.Info("Starting mod initialization.");
-    /// Log.Info($"version={version}");
+    /// // In mod constructor:
+    /// m_log = new ModLogger("AFD", "AutoForestryDesignations", ModVersion, typeof(AutoForestryDesignationsMod).Assembly);
+    ///
+    /// // In Initialize:
+    /// m_log.EnableConsoleLogging();
+    /// m_log.LogStartupBanner();
+    /// m_log.RegisterAutoConsoleMirroring(this, resolver.Resolve&lt;IGameLoopEvents&gt;(), resolver.Resolve&lt;GameConsoleCommandsExecutor&gt;());
     /// </code>
     /// </summary>
     public sealed class ModLogger
     {
-        private readonly string m_prefix;
+        private readonly string m_prefix;    // "[AFD] "
+        private readonly string m_filterTag; // "[AFD]"
+        private readonly string m_modId;
+        private readonly string m_manifestVersion;
+        private readonly Assembly m_modAssembly;
 
         /// <summary>
-        /// Creates a logger whose messages are prefixed with <c>[<paramref name="modTag"/>]</c>.
+        /// Creates a logger for the given mod. All identity fields are stored and
+        /// used by the zero-argument setup helpers.
         /// </summary>
-        public ModLogger(string modTag)
+        /// <param name="modTag">Short log tag, e.g. <c>"AFD"</c>. Wrapped in brackets for every log line.</param>
+        /// <param name="modId">Human-readable mod name, e.g. <c>"AutoForestryDesignations"</c>. Used in the startup banner.</param>
+        /// <param name="manifestVersion">Version string from <c>ModManifest.Version</c>.</param>
+        /// <param name="modAssembly">The mod's assembly, used to read the DLL build timestamp.</param>
+        public ModLogger(string modTag, string modId, string manifestVersion, Assembly modAssembly)
         {
             if (string.IsNullOrWhiteSpace(modTag))
-            {
                 throw new ArgumentException("Mod tag must be non-empty.", nameof(modTag));
-            }
+            if (string.IsNullOrWhiteSpace(modId))
+                throw new ArgumentException("Mod id must be non-empty.", nameof(modId));
+            if (string.IsNullOrWhiteSpace(manifestVersion))
+                throw new ArgumentException("Manifest version must be non-empty.", nameof(manifestVersion));
+            if (modAssembly == null)
+                throw new ArgumentNullException(nameof(modAssembly));
 
             m_prefix = $"[{modTag}] ";
+            m_filterTag = $"[{modTag}]";
+            m_modId = modId;
+            m_manifestVersion = manifestVersion;
+            m_modAssembly = modAssembly;
         }
 
         /// <summary>Logs an info message.</summary>
@@ -48,33 +71,31 @@ namespace CoI.AutoHelpers.Logging
         public void Exception(Exception ex, string context) => Log.Exception(ex, m_prefix + context);
 
         /// <summary>
-        /// Logs a one-time startup banner containing the mod id, version, and
-        /// DLL build timestamp. Produces a single identifiable line at the top
-        /// of each game session log.
-        ///
-        /// Example output:
-        /// <c>[ATD] AutoTerrainDesignations v0.4.0 | dll: 2026-05-14 16:30:00 UTC</c>
+        /// Subscribes to <c>Log.LogReceived</c> and mirrors log lines tagged with this
+        /// mod's filter to <c>UnityEngine.Debug</c>. No-op in Release builds.
+        /// Must be called before any logging to ensure the startup banner is visible
+        /// in the Unity console.
         /// </summary>
-        public void LogStartupBanner(string modId, string manifestVersion, Assembly modAssembly)
+        [System.Diagnostics.Conditional("DEBUG")]
+        public void EnableConsoleLogging() => ModConsoleLogger.Enable(m_filterTag);
+
+        /// <summary>
+        /// Logs a one-time startup banner. Call after <see cref="EnableConsoleLogging"/>.
+        /// Example output: <c>[AFD] AutoForestryDesignations v0.3.0 | dll: 2026-05-14 16:30:00 UTC</c>
+        /// </summary>
+        public void LogStartupBanner()
         {
-            if (string.IsNullOrWhiteSpace(modId))
-            {
-                throw new ArgumentException("Mod id must be non-empty.", nameof(modId));
-            }
-
-            if (string.IsNullOrWhiteSpace(manifestVersion))
-            {
-                throw new ArgumentException("Manifest version must be non-empty.", nameof(manifestVersion));
-            }
-
-            if (modAssembly == null)
-            {
-                throw new ArgumentNullException(nameof(modAssembly));
-            }
-
-            string dllTimestamp = GetDllBuildTimestamp(modAssembly);
-            Info($"{modId} v{manifestVersion} | dll: {dllTimestamp}");
+            string dllTimestamp = GetDllBuildTimestamp(m_modAssembly);
+            Info($"{m_modId} v{m_manifestVersion} | dll: {dllTimestamp}");
         }
+
+        /// <summary>
+        /// Registers a renderer-init callback that auto-executes <c>also_log_to_console true</c>.
+        /// No-op in Release builds.
+        /// </summary>
+        [System.Diagnostics.Conditional("DEBUG")]
+        public void RegisterAutoConsoleMirroring(object owner, IGameLoopEvents gameLoopEvents, GameConsoleCommandsExecutor consoleCommands)
+            => ModDebugHelpers.RegisterAutoConsoleMirroring(owner, gameLoopEvents, consoleCommands, m_filterTag);
 
         private static string GetDllBuildTimestamp(Assembly assembly)
         {
