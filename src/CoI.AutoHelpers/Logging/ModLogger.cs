@@ -114,21 +114,69 @@ namespace CoI.AutoHelpers.Logging
 
         private static string GetDllBuildTimestamp(Assembly assembly)
         {
-            try
+            // Try several path sources in order — Assembly.Location can be empty when the
+            // CoI mod loader uses shadow-copying or loads from a byte array.
+            string? path = TryResolveDllPath(assembly);
+            if (path != null)
             {
-                string location = assembly.Location;
-                if (!string.IsNullOrEmpty(location) && File.Exists(location))
+                try
                 {
-                    DateTime lastWrite = File.GetLastWriteTimeUtc(location);
+                    DateTime lastWrite = File.GetLastWriteTimeUtc(path);
                     return lastWrite.ToString("yyyy-MM-dd HH:mm:ss") + " UTC";
                 }
-            }
-            catch
-            {
-                // Best-effort: timestamp is diagnostic, not critical.
+                catch
+                {
+                    // Fall through to version fallback.
+                }
             }
 
+            // Fallback: assembly version is always available.
+            try
+            {
+                Version? v = assembly.GetName().Version;
+                if (v != null)
+                    return $"asm-ver:{v}";
+            }
+            catch { }
+
             return "<unknown>";
+        }
+
+        private static string? TryResolveDllPath(Assembly assembly)
+        {
+            // 1. assembly.Location — works when loaded via Assembly.LoadFrom.
+            try
+            {
+                string loc = assembly.Location;
+                if (!string.IsNullOrEmpty(loc) && File.Exists(loc))
+                    return loc;
+            }
+            catch { }
+
+            // 2. ManifestModule.FullyQualifiedName — same source, different API.
+            try
+            {
+                string fqn = assembly.ManifestModule.FullyQualifiedName;
+                if (!string.IsNullOrEmpty(fqn) && File.Exists(fqn))
+                    return fqn;
+            }
+            catch { }
+
+            // 3. CodeBase — deprecated but preserved in .NET 4.8; may differ from Location
+            //    when shadow-copying is active.
+            try
+            {
+                string cb = assembly.CodeBase;
+                if (!string.IsNullOrEmpty(cb))
+                {
+                    string local = new Uri(cb).LocalPath;
+                    if (File.Exists(local))
+                        return local;
+                }
+            }
+            catch { }
+
+            return null;
         }
     }
 }
