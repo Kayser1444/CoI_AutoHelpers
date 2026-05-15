@@ -36,11 +36,9 @@ namespace CoI.AutoHelpers.Localization
                 entries.Sort((left, right) => string.CompareOrdinal(left.Key, right.Key));
             }
 
-            int exportedCount = 0;
+            List<TranslationEntry> exportedEntries = new List<TranslationEntry>();
             int skippedCount = 0;
 
-            writer.WriteLine("[");
-            bool wroteAny = false;
             foreach (TranslationEntry entry in entries)
             {
                 if (!ShouldExportEntry(entry, options))
@@ -49,16 +47,16 @@ namespace CoI.AutoHelpers.Localization
                     continue;
                 }
 
-                if (wroteAny)
-                {
-                    writer.WriteLine(",");
-                }
-
-                WriteEntry(writer, entry);
-                wroteAny = true;
-                exportedCount++;
+                exportedEntries.Add(entry);
             }
-            writer.WriteLine();
+
+            int exportedCount = exportedEntries.Count;
+
+            writer.WriteLine("[");
+            for (int i = 0; i < exportedEntries.Count; i++)
+            {
+                WriteEntry(writer, exportedEntries[i], i < exportedEntries.Count - 1);
+            }
             writer.WriteLine("]");
 
             if (exportedCount == 0)
@@ -133,9 +131,9 @@ namespace CoI.AutoHelpers.Localization
             return value?.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static void WriteEntry(TextWriter writer, TranslationEntry entry)
+        private static void WriteEntry(TextWriter writer, TranslationEntry entry, bool appendComma)
         {
-            writer.Write("  [\n");
+            writer.WriteLine("  [");
             writer.Write("    \"");
             writer.Write(EscapeJson(entry.Key));
             writer.Write("\",");
@@ -154,6 +152,11 @@ namespace CoI.AutoHelpers.Localization
 
             writer.WriteLine();
             writer.Write("  ]");
+            if (appendComma)
+            {
+                writer.Write(",");
+            }
+            writer.WriteLine();
         }
 
         private static string EscapeJson(string value)
