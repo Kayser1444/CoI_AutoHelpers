@@ -73,22 +73,70 @@ namespace CoI.AutoHelpers.Logging
             gameLoopEvents.RegisterRendererInitState(owner, () =>
             {
 #if DEBUG
-                // also_log_to_console is a pure toggle with no boolean semantics — calling it
-                // a second time (from another mod) would flip console logging back off.
-                // AppDomain.CurrentDomain is shared across all assemblies in the same process,
-                // so this flag prevents any mod beyond the first from executing the command.
+                if (TryGetVanillaConsoleLoggingEnabled(consoleCommands, out bool isEnabled))
+                {
+                    if (isEnabled)
+                    {
+                        UnityEngine.Debug.Log($"{m_filterTag} Debug build: also_log_to_console already enabled.");
+                        return;
+                    }
+
+                    ExecuteAlsoLogToConsole(consoleCommands, m_filterTag);
+                    return;
+                }
+
+                // Fallback for game versions where ConsoleUi internals have moved.
                 const string k_appDomainKey = "CoI.AutoHelpers.ConsoleLoggingActivated";
                 if (AppDomain.CurrentDomain.GetData(k_appDomainKey) == null)
                 {
                     AppDomain.CurrentDomain.SetData(k_appDomainKey, true);
-                    bool enabled = consoleCommands.ExecuteOrSchedule("also_log_to_console true");
-                    if (enabled)
-                        UnityEngine.Debug.Log($"{m_filterTag} Debug build: auto-executed also_log_to_console.");
-                    else
-                        UnityEngine.Debug.LogWarning($"{m_filterTag} Debug build: failed to auto-execute also_log_to_console.");
+                    ExecuteAlsoLogToConsole(consoleCommands, m_filterTag);
                 }
 #endif
             });
+        }
+
+        internal static bool TryGetVanillaConsoleLoggingEnabled(GameConsoleCommandsExecutor consoleCommands, out bool enabled)
+        {
+            enabled = false;
+
+            try
+            {
+                if (!consoleCommands.Executor.Commands.TryGetValue("also_log_to_console", out GameCommand command))
+                    return false;
+
+                object target = command.Target;
+                if (target == null)
+                    return false;
+
+                FieldInfo? field = target.GetType().GetField(
+                    "m_isLoggingToConsole",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                if (field == null || field.FieldType != typeof(bool))
+                    return false;
+
+                object? value = field.GetValue(target);
+                if (!(value is bool boolValue))
+                    return false;
+
+                enabled = boolValue;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static bool ExecuteAlsoLogToConsole(GameConsoleCommandsExecutor consoleCommands, string logTag)
+        {
+            bool enabled = consoleCommands.ExecuteOrSchedule("also_log_to_console true");
+            if (enabled)
+                UnityEngine.Debug.Log($"{logTag} Debug build: auto-executed also_log_to_console.");
+            else
+                UnityEngine.Debug.LogWarning($"{logTag} Debug build: failed to auto-execute also_log_to_console.");
+
+            return enabled;
         }
 
         public static string GetDllBuildTimestamp(Assembly assembly)

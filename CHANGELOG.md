@@ -11,10 +11,13 @@ The project is currently pre-release and unstable.
 - `ModLogger` constructor simplified to tag-only (`new ModLogger("TAG")`); removed `modId`, `manifestVersion`, and `modAssembly` parameters
 - `LogStartupBanner()` removed; consuming mods now emit their own startup banner in their renderer-init callback using `ModLogger.GetDllBuildTimestamp`
 - `GetDllBuildTimestamp` promoted to `public static`; build timestamp fallbacks now report local time without a UTC suffix
-- `RegisterAutoConsoleMirroring` now uses `AppDomain.CurrentDomain.SetData` as a process-wide one-shot flag to prevent `also_log_to_console` from being toggled twice when multiple mods load (CoI treats `also_log_to_console` as a pure toggle regardless of argument)
+- `RegisterAutoConsoleMirroring` now inspects vanilla `ConsoleUi` logging state before executing `also_log_to_console`, with the existing `AppDomain` one-shot guard retained only as a fallback
+- `ModDebugHelpers.RegisterAutoConsoleMirroring` now uses the same vanilla-state inspection as `ModLogger`
 
 ### Added
 
+- `ModTranslations.ApplyAndLog(...)` to apply localization and emit diagnostics through `ModLogger`
+- Localization apply now degrades gracefully with a warning if reflected CoI localization internals are unavailable
 - Logging subsystem: `ModLogger` (prefix wrapper over `Mafi.Log`), `ModConsoleLogger` (debug-only `Log.LogReceived` subscriber), `ModDebugHelpers` (debug-only `also_log_to_console` auto-registration)
 - `CoI.AutoHelpers.csproj` now references `Mafi`, `Mafi.Core`, and `UnityEngine.CoreModule` for Logging type resolution
 

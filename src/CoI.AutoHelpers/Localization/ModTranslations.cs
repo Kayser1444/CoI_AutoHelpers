@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using CoI.AutoHelpers.Logging;
 
 namespace CoI.AutoHelpers.Localization
 {
@@ -18,6 +19,25 @@ namespace CoI.AutoHelpers.Localization
         {
             m_loader = loader ?? throw new ArgumentNullException(nameof(loader));
             m_runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        }
+
+        public ModTranslationsApplyResult ApplyAndLog(ModTranslationsApplyOptions options, ModLogger log)
+        {
+            if (log == null)
+            {
+                throw new ArgumentNullException(nameof(log));
+            }
+
+            ModTranslationsApplyResult result = Apply(options);
+            foreach (TranslationDiagnostic diagnostic in result.Diagnostics)
+            {
+                LogDiagnostic(log, diagnostic);
+            }
+
+            log.Info(
+                $"Localization apply complete: locale={result.AppliedLocaleCode}, entries={result.UpsertedEntryCount}, rebound={result.ReboundFieldCount}, missing={result.SkippedMissingTranslationFieldCount}, failed={result.FailedFieldCount}.");
+
+            return result;
         }
 
         public ModTranslationsApplyResult Apply(ModTranslationsApplyOptions options)
@@ -64,12 +84,31 @@ namespace CoI.AutoHelpers.Localization
                 return new ModTranslationsApplyResult(desiredCulture, 0, CreateEmptyRebindResult(), diagnostics);
             }
 
-            m_runtime.UpsertTranslations(selectedBundle);
-            int scannedFieldCount = m_runtime.ScanForStaticLocStrFields(options.ModAssembly);
-            LocalizationRebindResult rebindResult = m_runtime.RebindStaticLocalizationFields(
-                options.ModAssembly,
-                selectedBundle,
-                options.TranslationKeyPrefixes);
+            int scannedFieldCount;
+            LocalizationRebindResult rebindResult;
+            try
+            {
+                m_runtime.UpsertTranslations(selectedBundle);
+                scannedFieldCount = m_runtime.ScanForStaticLocStrFields(options.ModAssembly);
+                rebindResult = m_runtime.RebindStaticLocalizationFields(
+                    options.ModAssembly,
+                    selectedBundle,
+                    options.TranslationKeyPrefixes);
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(new TranslationDiagnostic(
+                    TranslationDiagnosticSeverity.Warning,
+                    options.TranslationsDirectory,
+                    $"Localization runtime integration failed and was skipped: {ex.Message}"));
+
+                return new ModTranslationsApplyResult(
+                    selectedBundle.LocaleCode,
+                    0,
+                    CreateEmptyRebindResult(),
+                    diagnostics);
+            }
+
             diagnostics.AddRange(rebindResult.Diagnostics);
             diagnostics.Add(new TranslationDiagnostic(
                 TranslationDiagnosticSeverity.Info,
@@ -81,6 +120,23 @@ namespace CoI.AutoHelpers.Localization
                 selectedBundle.Entries.Count,
                 rebindResult,
                 diagnostics);
+        }
+
+        private static void LogDiagnostic(ModLogger log, TranslationDiagnostic diagnostic)
+        {
+            string message = diagnostic.ToString();
+            switch (diagnostic.Severity)
+            {
+                case TranslationDiagnosticSeverity.Error:
+                    log.Error(message);
+                    break;
+                case TranslationDiagnosticSeverity.Warning:
+                    log.Warning(message);
+                    break;
+                default:
+                    log.Info(message);
+                    break;
+            }
         }
 
         private static TranslationBundle? SelectBestBundle(IReadOnlyList<TranslationBundle> bundles, string desiredCulture)

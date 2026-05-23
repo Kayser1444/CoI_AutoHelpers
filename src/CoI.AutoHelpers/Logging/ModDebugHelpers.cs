@@ -1,6 +1,6 @@
+using System;
 using Mafi.Core.Console;
 using Mafi.Core.GameLoop;
-using UnityEngine;
 
 namespace CoI.AutoHelpers.Logging
 {
@@ -34,11 +34,24 @@ namespace CoI.AutoHelpers.Logging
         {
             gameLoopEvents.RegisterRendererInitState(owner, () =>
             {
-                bool enabled = consoleCommands.ExecuteOrSchedule("also_log_to_console true");
-                if (enabled)
-                    UnityEngine.Debug.Log($"{logTag} Debug build: auto-executed also_log_to_console.");
-                else
-                    UnityEngine.Debug.LogWarning($"{logTag} Debug build: failed to auto-execute also_log_to_console.");
+                if (ModLogger.TryGetVanillaConsoleLoggingEnabled(consoleCommands, out bool isEnabled))
+                {
+                    if (isEnabled)
+                    {
+                        UnityEngine.Debug.Log($"{logTag} Debug build: also_log_to_console already enabled.");
+                        return;
+                    }
+
+                    ModLogger.ExecuteAlsoLogToConsole(consoleCommands, logTag);
+                    return;
+                }
+
+                const string k_appDomainKey = "CoI.AutoHelpers.ConsoleLoggingActivated";
+                if (AppDomain.CurrentDomain.GetData(k_appDomainKey) != null)
+                    return;
+
+                AppDomain.CurrentDomain.SetData(k_appDomainKey, true);
+                ModLogger.ExecuteAlsoLogToConsole(consoleCommands, logTag);
             });
         }
     }

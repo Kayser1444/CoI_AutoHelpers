@@ -47,7 +47,8 @@ This stays source-included and mod-scoped, with no shared runtime helper DLL.
 
 `ModTranslations.Apply(...)` performs culture resolution, bundle load/selection,
 runtime upsert, static field scan, and rebind. It returns a summary plus
-diagnostics.
+diagnostics. `ApplyAndLog(...)` wraps the same operation and logs all
+diagnostics through `ModLogger`.
 
 Current behavior highlights:
 
@@ -55,6 +56,9 @@ Current behavior highlights:
 - Bundle selection uses exact locale match first, then neutral locale
   fallback (for example `de-DE` -> `de`).
 - If no matching bundle exists, apply returns with warning diagnostics.
+- If reflected CoI localization internals cannot be resolved, apply returns a
+  warning diagnostic and leaves localization as a no-op rather than failing mod
+  load.
 
 ### Load and parse
 
@@ -140,15 +144,16 @@ Capabilities:
 7. Adapter scans static localization fields in the mod assembly.
 8. Adapter rebinds eligible static fields by ID.
 9. Consuming mod flushes any deferred UI refresh queue (if used).
-10. Mod logs diagnostics and summary counters from `ModTranslationsApplyResult`.
+10. Mod logs diagnostics and summary counters from `ModTranslationsApplyResult`,
+    or calls `ApplyAndLog(...)` to let the helper do that directly.
 
 ## Integration checklist for consuming mods
 
 - Source-include helper files (submodule or equivalent source link).
 - Keep translation JSON files in a dedicated translations directory.
-- Call `ModTranslations.Apply(...)` from a deterministic startup point.
+- Call `ModTranslations.ApplyAndLog(...)` or `Apply(...)` from a deterministic startup point.
 - Pass explicit key prefixes to scope rebind to the mod's key namespace.
-- Wire diagnostics into the mod's logging path.
+- Wire diagnostics into the mod's logging path if using `Apply(...)` directly.
 - Use deferred refresh only where UI text may have been captured early.
 
 ## Constraints and open decisions

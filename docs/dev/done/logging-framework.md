@@ -51,11 +51,16 @@ tag. Call in `IMod.Initialize` before any logging.
 Registers a renderer-init callback that (in Debug builds) executes the
 `also_log_to_console true` in-game console command.
 
-`also_log_to_console` is a **pure toggle** in CoI — calling it twice (once per
-mod when multiple mods load) flips console logging back off. The method uses
-`AppDomain.CurrentDomain.SetData` as a process-wide one-shot flag: only the
-first mod to run its renderer-init callback fires the command; all subsequent
-mods skip it.
+`also_log_to_console` is not idempotent in CoI. The vanilla implementation keeps
+state in `Mafi.Unity.Ui.ConsoleUi.m_isLoggingToConsole`; if the command receives
+the same value as the current state, it flips the requested value before
+applying it. `RegisterAutoConsoleMirroring` therefore inspects that vanilla
+field through the registered `also_log_to_console` command target and executes
+the command only when logging is currently disabled.
+
+If the vanilla command target or field cannot be resolved, the method falls back
+to an `AppDomain.CurrentDomain.SetData` one-shot guard so older/newer game
+versions still avoid repeated helper-owned toggles.
 
 The startup banner is **not** emitted by this method. Each mod announces its own
 version and DLL timestamp in its own renderer-init callback:
@@ -120,7 +125,7 @@ remain public for direct use if a `ModLogger` instance is not available.
 
 ### `ModDebugHelpers`
 
-Standalone Debug-only helper. `ModLogger.RegisterAutoConsoleMirroring` inlines
-the same `AppDomain` guard and `also_log_to_console` logic directly;
-`ModDebugHelpers` remains public for mods that want that behavior without
-constructing a `ModLogger`.
+Standalone Debug-only helper. It uses the same vanilla-state inspection and
+fallback guard as `ModLogger.RegisterAutoConsoleMirroring`; `ModDebugHelpers`
+remains public for mods that want that behavior without constructing a
+`ModLogger`.
