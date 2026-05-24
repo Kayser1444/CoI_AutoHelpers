@@ -16,6 +16,11 @@ The project is currently pre-release and unstable.
 
 ### Added
 
+- Persistence helpers: `ModSaveLifecycle`, `IModSaveLifecycleParticipant`, `IPersistedModState`, and `PersistedEntityStateMap<TState>`
+- Runtime cleanup contract: `IRuntimeOwned`
+- Save-detached vanilla attachment helpers: `IVanillaAttachment`, `ISaveDetachedVanillaAttachment`, `SaveDetachedVanillaAttachmentAttribute`, and `VanillaAttachmentManager`
+- JSON state storage abstraction: `IModStateJsonStore`, `ModStateJsonStores`, `ModStateJsonSaveResult`, and vanilla `ModJsonConfig` string-backed storage
+- Persistence framework guide documenting runtime state, save-detached attachments, persisted models, and vanilla config-backed JSON storage
 - `ModTranslations.ApplyAndLog(...)` to apply localization and emit diagnostics through `ModLogger`
 - Localization apply now degrades gracefully with a warning if reflected CoI localization internals are unavailable
 - Logging subsystem: `ModLogger` (prefix wrapper over `Mafi.Log`), `ModConsoleLogger` (debug-only `Log.LogReceived` subscriber), `ModDebugHelpers` (debug-only `also_log_to_console` auto-registration)

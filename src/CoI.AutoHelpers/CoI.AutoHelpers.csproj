@@ -24,6 +24,9 @@ released Captain of Industry mods should still consume the helper as source.
   <ItemGroup>
     <Compile Include="Localization\**\*.cs" />
     <Compile Include="Logging\**\*.cs" />
+    <Compile Include="Persistence\**\*.cs" />
+    <Compile Include="Runtime\**\*.cs" />
+    <Compile Include="VanillaAttachments\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

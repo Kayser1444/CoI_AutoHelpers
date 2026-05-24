@@ -7,21 +7,20 @@ using System;
 using System.IO;
 using System.Reflection;
 using CoI.AutoHelpers.Localization;
+using CoI.AutoHelpers.Logging;
 
 public sealed class ModDefinition : Mod
 {
+    private static readonly ModLogger s_log = new ModLogger("ATD");
+
     public ModDefinition(ModManifest manifest) : base(manifest)
     {
         ModTranslations translations = new ModTranslations();
-        ModTranslationsApplyResult result = translations.Apply(new ModTranslationsApplyOptions(
+        ModTranslationsApplyResult result = translations.ApplyAndLog(new ModTranslationsApplyOptions(
             translationsDirectory: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Translations"),
             modAssembly: typeof(ModDefinition).Assembly,
-            translationKeyPrefixes: new[] { "Kayser_ATD_" }));
-
-        if (result.HasErrors)
-        {
-            // Wire to your mod logging convention.
-        }
+            translationKeyPrefixes: new[] { "Kayser_ATD_" }),
+            s_log);
     }
 }
 ```
@@ -77,6 +76,8 @@ Embed the build timestamp in the consuming mod's `.csproj`:
 
 - The helper currently expects translation files in `Translations/*.json`.
 - The example uses a translation key prefix to scope `LocStr` rebinds to the consuming mod.
+- Use `ModTranslations.Apply(...)` instead of `ApplyAndLog(...)` if the consuming mod needs custom diagnostic handling.
 - Use `DeferredUiRefreshQueue` for any panel or tooltip refreshes that need to occur after localization apply.
 - `TranslationTemplateExporter` can be used for build-time English template output or a future console command.
+- For save lifecycle, save-detached vanilla attachments, and helper-owned persisted state models, see [Persistence Framework Guide](persistence-guide.md).
 - The helper stays source-included in the released mod; this project file is only for validating the helper source set during development.
