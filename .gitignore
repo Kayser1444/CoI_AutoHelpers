@@ -18,6 +18,7 @@ project.nuget.cache
 *.suo
 *.userosscache
 *.sln.docstates
+*.lscache
 
 # OS noise
 Thumbs.db
