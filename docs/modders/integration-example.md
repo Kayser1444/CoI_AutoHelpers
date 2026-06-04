@@ -72,6 +72,67 @@ Embed the build timestamp in the consuming mod's `.csproj`:
 </ItemGroup>
 ```
 
+## Settings
+
+Register a settings tab so the mod's options appear in the shared **Mod Settings**
+window (HUD button or `Alt+M`).
+
+Wire `EnsureInitialized` and `RegisterTab` inside a `RegisterRendererInitState`
+callback — this is the earliest safe point where `HudController` and `UiRoot`
+are available.
+
+```csharp
+using CoI.AutoHelpers.Settings;
+using Mafi.Unity.UiToolkit.Component;
+using Mafi.Unity.UiToolkit.Library;
+
+// In IMod.Initialize:
+gameLoopEvents.RegisterRendererInitState(this, () =>
+{
+    ModSettings.EnsureInitialized(
+        resolver.Resolve<HudController>(),
+        resolver.Resolve<UiRoot>(),
+        resolver.Resolve<IRootEscapeManager>());
+
+    ModSettings.RegisterTab(BuildSettingsTab());
+});
+
+private static ModSettingsTab BuildSettingsTab()
+{
+    return new ModSettingsTab(
+        modId:        "my-mod",
+        modName:      MyLocalization.ModName.AsFormatted,
+        title:        MyLocalization.SettingsTabTitle.AsFormatted,
+        order:        100,
+        buildContent: BuildSettingsContent,
+        iconAssetPath: "Assets/Unity/UserInterface/Toolbar/Stats.svg");
+}
+
+private static UiComponent BuildSettingsContent()
+{
+    var root = new Column(2.pt()).AlignItemsStretch().PaddingLeft(4.pt()).Width(60.Percent());
+
+    root.Add(new Title(MyLocalization.SectionHeading.AsFormatted).MarginLeft(-4.pt()));
+
+    root.Add(new Dropdown<MyEnumOption>(option => new DropdownItem<MyEnumOption>(
+            MyLocalization.OptionLabel(option).AsFormatted, option))
+        .Label(MyLocalization.SettingLabel.AsFormatted)
+        .LabelWidth(50.Percent())
+        .SetOptions(MyEnumOption.A, MyEnumOption.B)
+        .SetValue(MySettings.CurrentOption)
+        .OnValueChanged((value, _) => MySettings.SetOption(value)));
+
+    return root;
+}
+```
+
+If the mod registers more than one tab under the same `modId`, they appear as
+nested tabs within the top-level mod entry. For a single tab the content is
+shown directly.
+
+For a detailed explanation of multi-mod coordination and the full `ModSettingsTab`
+API, see [Settings Framework](../dev/done/settings-framework.md).
+
 ## Notes
 
 - The helper currently expects translation files in `Translations/*.json`.

@@ -8,10 +8,10 @@ The helper should provide:
 
 - structured localization ✓
 - consistent logging and diagnostics ✓
+- reusable settings infrastructure ✓
+- persistence helpers ✓
 - attribute-driven metadata
-- reusable settings infrastructure
 - console command helpers
-- persistence helpers
 
 without introducing runtime DLL dependencies.
 

@@ -6,7 +6,7 @@ This repository is intended to be consumed as a **source-included Git submodule*
 
 ## Purpose
 
-CoI AutoHelpers provides shared implementation patterns for the Kayser mod family, starting with localization support and leaving room for later common infrastructure such as settings, console commands, save persistence, and attribute-driven registration.
+CoI AutoHelpers provides shared implementation patterns for the Kayser mod family, including localization, logging, settings, and persistence infrastructure.
 
 Initial target mods:
 
@@ -52,13 +52,13 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 - Localization: `ModTranslations` apply pipeline (load → select locale → splice → rebind), deferred UI refresh queue, deterministic English template exporter
 - Logging: `ModLogger` (prefix wrapper + startup banner), `ModConsoleLogger` (debug-only `Log.LogReceived` mirror), `ModDebugHelpers` (debug-only `also_log_to_console` auto-registration)
+- Settings: shared `ModSettings` window with HUD button and `Alt+M` shortcut; `ModSettingsTab` registration API; multi-mod coordination via a shared named game object
+- Persistence: `ModSaveLifecycle`, save-detached vanilla attachment management, JSON state storage abstractions (`IModStateJsonStore`, `ModStateJsonStores`), `IModStateJsonStore` vanilla config-backed storage
 
 ### Planned placeholders
 
 - Attribute-driven metadata
-- Global settings helpers
 - Console command helpers
-- Save persistence helpers
 
 ## Design principles
 
@@ -71,4 +71,4 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 ## Repository status
 
-Early development. Localization and logging subsystems are implemented and consumed by ATD and AFD. No stable public API yet.
+Early development. Localization, logging, settings, and persistence subsystems are implemented and consumed by ATD, AFD, and Designer Toolkit. No stable public API yet.
