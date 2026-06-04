@@ -16,6 +16,9 @@ The project is currently pre-release and unstable.
 
 ### Added
 
+- Settings framework:
+  - Added a shared **Mod Settings** window with HUD button and `Alt+M` shortcut support.
+  - Added tab registration APIs so consuming mods can contribute one or more settings tabs.
 - Persistence framework:
   - Added `ModSaveLifecycle`, `IModSaveLifecycleParticipant`, `IPersistedModState`, and `PersistedEntityStateMap<TState>`.
   - Added the `IRuntimeOwned` runtime cleanup contract.
