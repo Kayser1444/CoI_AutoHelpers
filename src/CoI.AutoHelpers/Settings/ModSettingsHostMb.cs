@@ -82,6 +82,29 @@ namespace CoI.AutoHelpers.Settings
             LocStrFormatted modName,
             LocStrFormatted title,
             int order,
+            Func<UiComponent> buildContent,
+            string? iconAssetPath,
+            string? modIconAssetPath)
+        {
+            RegisterTab(new ModSettingsTab(modId, modName, title, order, buildContent, iconAssetPath, modIconAssetPath));
+        }
+
+        public void RegisterExternalTab(
+            string modId,
+            LocStrFormatted modName,
+            LocStrFormatted title,
+            int order,
+            Func<UiComponent> buildContent,
+            string? iconAssetPath)
+        {
+            RegisterTab(new ModSettingsTab(modId, modName, title, order, buildContent, iconAssetPath));
+        }
+
+        public void RegisterExternalTab(
+            string modId,
+            LocStrFormatted modName,
+            LocStrFormatted title,
+            int order,
             Func<UiComponent> buildContent)
         {
             RegisterTab(new ModSettingsTab(modId, modName, title, order, buildContent));

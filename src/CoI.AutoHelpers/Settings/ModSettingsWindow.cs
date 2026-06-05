@@ -42,7 +42,7 @@ namespace CoI.AutoHelpers.Settings
                     ? BuildTabContent(first)
                     : BuildNestedTabs(modTabEntries);
 
-                modTabs.AddTab(first.ModName, modContent, first.IconAssetPath, null, false, true, null);
+                modTabs.AddTab(first.ModName, modContent, first.ModIconAssetPath ?? first.IconAssetPath, null, false, true, null);
             }
 
             m_tabsSlot.Add(modTabs);
@@ -52,7 +52,7 @@ namespace CoI.AutoHelpers.Settings
         {
             TabContainer nestedTabs = new TabContainer();
             foreach (ModSettingsTab tab in tabs)
-                nestedTabs.AddTab(tab.Title, BuildTabContent(tab), tab.IconAssetPath, null, false, true, null);
+                nestedTabs.AddTab(tab.Title, BuildTabContent(tab), tab.IconAssetPath, null, false, false, null);
             return nestedTabs;
         }
 

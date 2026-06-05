@@ -5,6 +5,7 @@ using Mafi.Localization;
 using Mafi.Unity;
 using Mafi.Unity.Ui.Hud;
 using Mafi.Unity.UiToolkit;
+using Mafi.Unity.UiToolkit.Component;
 using UnityEngine;
 
 namespace CoI.AutoHelpers.Settings
@@ -132,7 +133,77 @@ namespace CoI.AutoHelpers.Settings
         {
             MethodInfo? method = host.GetType().GetMethod(
                 "RegisterExternalTab",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new Type[]
+                {
+                    typeof(string),
+                    typeof(LocStrFormatted),
+                    typeof(LocStrFormatted),
+                    typeof(int),
+                    typeof(Func<UiComponent>),
+                    typeof(string),
+                    typeof(string)
+                },
+                null);
+
+            if (method != null)
+            {
+                method.Invoke(host, new object[]
+                {
+                    tab.ModId,
+                    tab.ModName,
+                    tab.Title,
+                    tab.Order,
+                    tab.BuildContent,
+                    tab.IconAssetPath ?? string.Empty,
+                    tab.ModIconAssetPath ?? string.Empty
+                });
+                return;
+            }
+
+            method = host.GetType().GetMethod(
+                "RegisterExternalTab",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new Type[]
+                {
+                    typeof(string),
+                    typeof(LocStrFormatted),
+                    typeof(LocStrFormatted),
+                    typeof(int),
+                    typeof(Func<UiComponent>),
+                    typeof(string)
+                },
+                null);
+
+            if (method != null)
+            {
+                method.Invoke(host, new object[]
+                {
+                    tab.ModId,
+                    tab.ModName,
+                    tab.Title,
+                    tab.Order,
+                    tab.BuildContent,
+                    tab.IconAssetPath ?? string.Empty
+                });
+                return;
+            }
+
+            method = host.GetType().GetMethod(
+                "RegisterExternalTab",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new Type[]
+                {
+                    typeof(string),
+                    typeof(LocStrFormatted),
+                    typeof(LocStrFormatted),
+                    typeof(int),
+                    typeof(Func<UiComponent>)
+                },
+                null);
 
             if (method != null)
             {

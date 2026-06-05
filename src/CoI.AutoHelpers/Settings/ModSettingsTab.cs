@@ -20,6 +20,8 @@ namespace CoI.AutoHelpers.Settings
 
         public string? IconAssetPath { get; }
 
+        public string? ModIconAssetPath { get; }
+
         public Func<UiComponent> BuildContent { get; }
 
         public ModSettingsTab(
@@ -28,13 +30,15 @@ namespace CoI.AutoHelpers.Settings
             LocStrFormatted title,
             int order,
             Func<UiComponent> buildContent,
-            string? iconAssetPath = null)
+            string? iconAssetPath = null,
+            string? modIconAssetPath = null)
         {
             ModId = modId ?? string.Empty;
             ModName = modName;
             Title = title;
             Order = order;
             IconAssetPath = iconAssetPath;
+            ModIconAssetPath = modIconAssetPath;
             BuildContent = buildContent ?? throw new ArgumentNullException(nameof(buildContent));
         }
     }
