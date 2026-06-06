@@ -9,6 +9,7 @@ namespace CoI.AutoHelpers.Settings
     internal sealed class ModSettingsWindow : Window
     {
         private readonly Column m_tabsSlot;
+        private string? m_activeModId;
 
         public ModSettingsWindow(ModSettingsHostMb host)
             : base(ModSettings.Loc("Title", "Mod Settings"), false)
@@ -31,6 +32,17 @@ namespace CoI.AutoHelpers.Settings
             }
 
             TabContainer modTabs = new TabContainer();
+            var modIdByContent = new Dictionary<UiComponent, string>();
+            modTabs.OnTabActivate(() =>
+            {
+                UiComponent? activeTab = modTabs.ActiveTab.ValueOrNull;
+                if (activeTab != null && modIdByContent.TryGetValue(activeTab, out string modId))
+                    m_activeModId = modId;
+            });
+
+            string? requestedActiveModId = m_activeModId;
+            bool selectedTabExists = !string.IsNullOrWhiteSpace(requestedActiveModId)
+                && tabs.Any(tab => tab.ModId == requestedActiveModId);
             foreach (var group in tabs.GroupBy(tab => tab.ModId).OrderBy(g => g.Min(tab => tab.Order)))
             {
                 List<ModSettingsTab> modTabEntries = group.OrderBy(tab => tab.Order).ThenBy(tab => tab.Title.Value).ToList();
@@ -42,7 +54,15 @@ namespace CoI.AutoHelpers.Settings
                     ? BuildTabContent(first)
                     : BuildNestedTabs(modTabEntries);
 
-                modTabs.AddTab(first.ModName, modContent, first.ModIconAssetPath ?? first.IconAssetPath, null, false, true, null);
+                modIdByContent[modContent] = first.ModId;
+                modTabs.AddTab(
+                    first.ModName,
+                    modContent,
+                    first.ModIconAssetPath ?? first.IconAssetPath,
+                    null,
+                    selectedTabExists && first.ModId == requestedActiveModId,
+                    true,
+                    null);
             }
 
             m_tabsSlot.Add(modTabs);

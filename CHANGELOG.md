@@ -13,6 +13,7 @@ The project is currently pre-release and unstable.
 - Promoted `GetDllBuildTimestamp` to `public static`; timestamp fallbacks now report local time without a UTC suffix.
 - Updated `RegisterAutoConsoleMirroring` to inspect vanilla `ConsoleUi` logging state before executing `also_log_to_console`, keeping the existing `AppDomain` one-shot guard only as a fallback.
 - Updated `ModDebugHelpers.RegisterAutoConsoleMirroring` to use the same vanilla-state inspection as `ModLogger`.
+- Updated the shared Mod Settings window to remember the last active top-level mod tab for the current runtime session.
 
 ### Added
 
