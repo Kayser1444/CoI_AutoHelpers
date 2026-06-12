@@ -156,6 +156,11 @@ namespace CoI.AutoHelpers.Settings
         {
             yield return new WaitForSeconds(2.5f);
             AddHudButton();
+            if (!m_buttonAdded)
+            {
+                yield return new WaitForSeconds(2.0f);
+                AddHudButton();
+            }
         }
 
         private void AddHudButton()

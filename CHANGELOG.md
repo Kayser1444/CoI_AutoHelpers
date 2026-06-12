@@ -6,6 +6,10 @@ The project is currently pre-release and unstable.
 
 ## [Unreleased]
 
+### Fixed
+
+- Added a fallback retry check 2 seconds after the initial attempt to register the settings HUD button (M), ensuring it gets added if the HUD is slow to initialize.
+
 ### Changed
 
 - Simplified `ModLogger` construction to tag-only usage (`new ModLogger("TAG")`), removing the older `modId`, `manifestVersion`, and `modAssembly` parameters.
