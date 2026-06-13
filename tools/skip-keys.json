@@ -1,0 +1,10 @@
+{
+  "_comment": "Keys that are intentionally identical to English in all languages. These are excluded from untranslated key detection.",
+  "exact": [
+    "dtk.mod.name",
+    "dtk.settings.language.hybrid",
+    "dtk.settings.language.local",
+    "dtk.settings.number_format.auto",
+    "dtk.rate_limit.items_per_min"
+  ]
+}
