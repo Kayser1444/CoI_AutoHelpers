@@ -21,6 +21,7 @@ The project is currently pre-release and unstable.
 
 ### Added
 
+- Added `CustomKeybindsInjector` utility to inject custom keybindings, persist them via `UnityEngine.PlayerPrefs`, and integrate them into the game's Shortcuts settings.
 - Settings framework:
   - Added a shared **Mod Settings** window with HUD button and `Alt+M` shortcut support.
   - Added tab registration APIs so consuming mods can contribute one or more settings tabs.
