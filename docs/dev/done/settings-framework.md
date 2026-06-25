@@ -4,6 +4,21 @@ Four files under `src/CoI.AutoHelpers/Settings/` provide a shared Mod Settings
 window that any number of consuming mods can contribute tabs to without
 creating duplicate windows or runtime DLL conflicts.
 
+## Current implementation
+
+The current implementation is focused on a single shared settings host and a
+single shared window for all AutoHelpers-consuming mods.
+
+- `ModSettings.EnsureInitialized(...)` creates or adopts the shared host object,
+  then registers the HUD button.
+- `ModSettings.RegisterTab(...)` queues tabs until initialization completes and
+  forwards them to the shared host once it exists.
+- `ModSettingsHostMb` injects the HUD button into the calendar area and retries
+  once after 2 seconds if the vanilla HUD container was not ready on the first
+  pass.
+- The shared window remembers the last active top-level mod tab for the current
+  runtime session.
+
 ## Components
 
 ### `ModSettings` (public static)
@@ -21,12 +36,12 @@ using CoI.AutoHelpers.Settings;
 
 gameLoopEvents.RegisterRendererInitState(this, () =>
 {
-    ModSettings.EnsureInitialized(
-        resolver.Resolve<HudController>(),
-        resolver.Resolve<UiRoot>(),
-        resolver.Resolve<IRootEscapeManager>());
+   ModSettings.EnsureInitialized(
+       resolver.Resolve<HudController>(),
+       resolver.Resolve<UiRoot>(),
+       resolver.Resolve<IRootEscapeManager>());
 
-    ModSettings.RegisterTab(MyMod.BuildSettingsTab());
+   ModSettings.RegisterTab(MyMod.BuildSettingsTab());
 });
 ```
 
@@ -52,13 +67,17 @@ Describes one tab contributed to the shared window.
 
 ```csharp
 new ModSettingsTab(
-    modId:        "my-mod",
-    modName:      MyLocalization.ModName.AsFormatted,
-    title:        MyLocalization.SettingsTabTitle.AsFormatted,
-    order:        100,
-    buildContent: BuildMySettingsContent,
-    iconAssetPath: "Assets/Unity/UserInterface/Toolbar/Stats.svg");
+   modId:            "my-mod",
+   modName:          MyLocalization.ModName.AsFormatted,
+   title:            MyLocalization.SettingsTabTitle.AsFormatted,
+   order:            100,
+   buildContent:     BuildMySettingsContent,
+   iconAssetPath:    "Assets/Unity/UserInterface/Toolbar/Stats.svg",
+   modIconAssetPath: "Assets/Unity/UserInterface/Toolbar/Stats.svg");
 ```
+
+The constructor now accepts an optional `modIconAssetPath` for the top-level
+mod tab icon, in addition to the nested-tab `iconAssetPath`.
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -68,6 +87,7 @@ new ModSettingsTab(
 | `order` | `int` | Sort order across mods and within nested tabs. Lower values appear first. |
 | `buildContent` | `Func<UiComponent>` | Factory called each time the window is opened to build the settings panel content. |
 | `iconAssetPath` | `string?` | Optional in-game asset path for the tab icon. |
+| `modIconAssetPath` | `string?` | Optional in-game asset path for the top-level mod-tab icon. |
 
 **Single vs multiple tabs per mod**
 
@@ -96,8 +116,8 @@ Attached to a persistent `DontDestroyOnLoad` game object named
 
 Responsibilities:
 - Opens / closes the window.
-- Adds a HUD button ~2.5 s after initialization (deferred to avoid startup
-  race conditions with the vanilla HUD layout).
+- Adds a HUD button after initialization, then retries once after 2 seconds if
+  the vanilla HUD container was not ready on the first pass.
 - Handles `Alt+M` keyboard shortcut.
 - Implements `IRootEscapeHandler` so pressing Escape closes the window.
 - Exposes `RegisterExternalTab(...)` for cross-assembly tab registration.

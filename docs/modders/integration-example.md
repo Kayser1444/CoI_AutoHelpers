@@ -1,11 +1,10 @@
 # Mod Integration Example
 
-This example shows the intended consuming pattern for the helper from a Captain of Industry mod constructor.
+This example shows the current consuming pattern for the helper from a Captain of Industry mod constructor.
 
 ```csharp
 using System;
 using System.IO;
-using System.Reflection;
 using CoI.AutoHelpers.Localization;
 using CoI.AutoHelpers.Logging;
 
@@ -16,10 +15,11 @@ public sealed class ModDefinition : Mod
     public ModDefinition(ModManifest manifest) : base(manifest)
     {
         ModTranslations translations = new ModTranslations();
-        ModTranslationsApplyResult result = translations.ApplyAndLog(new ModTranslationsApplyOptions(
-            translationsDirectory: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Translations"),
-            modAssembly: typeof(ModDefinition).Assembly,
-            translationKeyPrefixes: new[] { "Kayser_ATD_" }),
+        ModTranslationsApplyResult result = translations.ApplyAndLog(
+            new ModTranslationsApplyOptions(
+                translationsDirectory: Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Translations"),
+                modAssembly: typeof(ModDefinition).Assembly,
+                translationKeyPrefixes: new[] { "Kayser_ATD_" }),
             s_log);
     }
 }
@@ -100,12 +100,13 @@ gameLoopEvents.RegisterRendererInitState(this, () =>
 private static ModSettingsTab BuildSettingsTab()
 {
     return new ModSettingsTab(
-        modId:        "my-mod",
-        modName:      MyLocalization.ModName.AsFormatted,
-        title:        MyLocalization.SettingsTabTitle.AsFormatted,
-        order:        100,
-        buildContent: BuildSettingsContent,
-        iconAssetPath: "Assets/Unity/UserInterface/Toolbar/Stats.svg");
+        modId:            "my-mod",
+        modName:          MyLocalization.ModName.AsFormatted,
+        title:            MyLocalization.SettingsTabTitle.AsFormatted,
+        order:            100,
+        buildContent:     BuildSettingsContent,
+        iconAssetPath:    "Assets/Unity/UserInterface/Toolbar/Stats.svg",
+        modIconAssetPath: "Assets/Unity/UserInterface/Toolbar/Stats.svg");
 }
 
 private static UiComponent BuildSettingsContent()
@@ -132,6 +133,24 @@ shown directly.
 
 For a detailed explanation of multi-mod coordination and the full `ModSettingsTab`
 API, see [Settings Framework](../dev/done/settings-framework.md).
+
+## Custom keybindings
+
+Use `CustomKeybindsInjector` when a mod should expose shortcuts through the game's
+Shortcuts settings screen. Call it during mod initialization after the helper
+source has been compiled into the mod assembly:
+
+```csharp
+using CoI.AutoHelpers.InputControl;
+using HarmonyLib;
+
+Harmony harmony = new Harmony("MyMod.AutoHelpers");
+CustomKeybindsInjector.ApplyPatches(harmony, "My Mod", typeof(MyKeybinds));
+```
+
+The injector expects static `KeyBindings` properties annotated with CoI's
+`KbAttribute` metadata; it persists them through `PlayerPrefs` and exposes them
+under a custom `"<ModName> (Mod)"` category in the Shortcuts menu.
 
 ## Notes
 
