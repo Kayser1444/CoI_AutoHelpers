@@ -1,0 +1,18 @@
+* text=auto
+
+*.cs text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.ps1 text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+LICENSE text eol=lf
+
+*.png binary
+*.dll binary
+*.zip binary
