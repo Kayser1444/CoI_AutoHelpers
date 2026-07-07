@@ -1,237 +1,90 @@
-# Helper Architecture
+# Current Helper Architecture
 
-## Vision
+This document records the helper architecture that is implemented in the
+repository today, plus the remaining work areas that are still intentionally
+kept as future improvements.
 
-CoI AutoHelpers is intended to become a reusable source-level infrastructure layer for Kayser's Captain of Industry mods.
+## Source inclusion model
 
-The helper should provide:
+CoI AutoHelpers is compiled directly into each consuming mod assembly. That
+keeps the helper mod-scoped and avoids runtime DLL conflicts between multiple
+mods that include the same helper code.
 
-- structured localization ✓
-- consistent logging and diagnostics ✓
-- reusable settings infrastructure ✓
-- persistence helpers ✓
-- attribute-driven metadata
-- console command helpers
+## Implemented subsystems
 
-without introducing runtime DLL dependencies.
+### Localization
 
-## Architectural principles
+The localization subsystem is the most mature part of the helper.
 
-### 1. Source-level inclusion
+- `ModTranslations` loads translation bundles, selects the best locale for the
+  active culture, splices translations into CoI's runtime localization data, and
+  rebinds static `LocStr` fields in the consuming assembly.
+- `DeferredUiRefreshQueue` and `LaterTextExtensions` provide targeted deferred UI
+  refreshes for text that may have been captured too early.
+- `TranslationTemplateExporter` emits deterministic English templates for
+  translation authoring.
 
-The helper is compiled into each consuming mod.
+### Logging
 
-Implications:
+The logging subsystem centralizes the common logging conventions used by the
+consuming mods.
 
-- no shared runtime state between mods
-- no helper DLL version conflicts
-- each mod pins its own helper revision
-
-## 2. Explicit ownership
-
-The helper should avoid hidden magic.
-
-Good:
-
-```csharp
-KayserModSupport.Init(...)
-```
-
-Avoid:
-
-```csharp
-automatic global static scanning with hidden side effects
-```
-
-Reflection-based features are acceptable when they solve CoI engine limitations, but should remain localized and explicit.
-
-## 3. Mod-scoped state
-
-All runtime state should conceptually belong to the consuming mod.
-
-Avoid assumptions that several Kayser mods share runtime memory.
-
-## 4. Attribute-driven metadata
-
-Attributes are expected to become an important structural mechanism.
-
-Potential future examples:
-
-```csharp
-[TranslationPrefix("Kayser_ATD_")]
-[SettingsSection("AutoTerrainDesignations")]
-[ConsoleCommandPrefix("atd_")]
-```
-
-The goal is not to create a heavy framework, but to centralize repetitive metadata and improve consistency.
-
-## 5. Readonly-first helper design
-
-The helper should generally prefer immutable configuration objects and readonly semantics where practical.
-
-Potential examples:
-
-- readonly configuration structs
-- immutable translation descriptors
-- immutable registration metadata
-
-Benefits:
-
-- safer reflection interactions
-- reduced accidental mutation
-- clearer intent
-- simpler debugging
-
-Performance gains are secondary.
-
-## Initial module layout
-
-```text
-src/
-  CoI.AutoHelpers/
-    Localization/
-    Settings/
-    Console/
-    Persistence/
-    Common/
-```
-
-## Localization architecture
-
-Localization is the first active subsystem.
-
-### Problem summary
-
-CoI initializes static `LocStr` fields before mod constructors execute.
-
-This means:
-
-```csharp
-public static readonly LocStr X =
-    Loc.Str("My_Key", "English fallback", "");
-```
-
-may permanently snapshot the English fallback even if translation files exist.
-
-The helper architecture therefore needs:
-
-1. translation file loading
-2. translation splice into `LocalizationManager.s_data`
-3. static `LocStr` rebind
-4. optional deferred UI refresh
-5. translation export tooling
-
-## Planned localization modules
-
-### ModTranslations
-
-Responsibilities:
-
-- locate translation files
-- parse JSON translation data
-- splice translations into CoI localization tables
-- perform static `LocStr` rebind
-- expose diagnostics/logging
-
-### TranslationExporter
-
-Responsibilities:
-
-- export English translation templates
-- filter by mod prefixes
-- support plural variants
-- avoid TODO/HIDE entries
-
-### LaterTextExtensions
-
-Responsibilities:
-
-- deferred UI text refresh
-- mitigation for early UI capture
-- optional and targeted usage
-
-## Translation file layout
-
-```text
-Translations/
-  en.json
-  sv-SE.json
-  de.json
-```
-
-JSON schema:
-
-```json
-[
-  ["Key", "Translation"],
-  ["PluralKey", "Singular", "Plural"]
-]
-```
-
-## Initialization model
-
-Expected consuming pattern:
-
-```csharp
-public ModDefinition(ModManifest manifest) : base(manifest)
-{
-    KayserModSupport.Init(new KayserModSupportOptions {
-        Manifest = manifest,
-        Assembly = typeof(ModDefinition).Assembly,
-        ModId = "Kayser.AutoTerrainDesignations",
-        TranslationKeyPrefixes = new[] {
-            "Kayser_ATD_"
-        },
-        ConsoleCommandPrefix = "atd_"
-    });
-}
-```
-
-## Planned future areas
+- `ModLogger` wraps CoI's logging API with a short tag prefix.
+- `ModConsoleLogger` mirrors tagged lines into the Unity debug console in debug
+  builds.
+- `ModDebugHelpers` exposes the same console-mirroring behavior without requiring
+  a `ModLogger` instance.
 
 ### Settings
 
-Potential goals:
+The settings subsystem provides a single shared settings window that multiple
+mods can contribute to.
 
-- declarative settings registration
-- automatic settings UI grouping
-- settings file serialization
-- attribute-driven metadata
+- `ModSettings` is the public registration entry point.
+- `ModSettingsTab` describes the tab content contributed by a consuming mod.
+- `ModSettingsHostMb` owns the shared host object, HUD button, `Alt+M` shortcut,
+  and escape handling.
 
 ### Persistence
 
-Potential goals:
+The persistence subsystem focuses on mod-owned save lifecycle work and runtime
+state that must not leak into vanilla save traversal.
 
-- stable mod-owned save data
-- object attachment helpers
-- safer serialization boundaries
-- mod removability support
+- `ModSaveLifecycle` coordinates save-time behavior for the mod.
+- `VanillaAttachmentManager` and `ISaveDetachedVanillaAttachment` support
+  save-detached vanilla attachments.
+- `IModStateJsonStore` and `ModStateJsonStores` provide the current JSON state
+  storage abstraction with a vanilla config-backed implementation.
 
-### Console commands
+### Input control
 
-Potential goals:
+The input-control subsystem is a newer addition for custom keybindings.
 
-- consistent naming
-- automatic help generation
-- translation export hooks
-- debug tooling
+- `CustomKeybindsInjector` patches the game's shortcuts system to expose custom
+  keybindings from a consuming mod.
+- It persists bindings through `PlayerPrefs` and exposes them through the
+  Shortcuts UI under a custom mod-specific category.
 
-### Common
+## Current module layout
 
-Potential goals:
+```text
+src/CoI.AutoHelpers/
+  InputControl/
+  Localization/
+  Logging/
+  Persistence/
+  Runtime/
+  Settings/
+  VanillaAttachments/
+```
 
-- logging helpers
-- version diagnostics
-- reflection helpers
-- compatibility checks
+## Remaining work
 
-## Non-goals
+The helper still has a small number of intentionally future-facing areas:
 
-The helper should avoid becoming:
+- attribute-driven metadata helpers
+- console-command helpers
+- additional conventions for future helper modules
 
-- a heavyweight framework
-- a runtime dependency mod
-- a hidden dependency injection container
-- a generic utility dump
-
-The priority is practical infrastructure for a coherent family of CoI mods.
+These areas are still documented as planned work rather than shipped
+implementation because they are not yet part of the current public helper surface.
