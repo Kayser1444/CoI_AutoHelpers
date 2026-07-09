@@ -6,7 +6,7 @@ This repository is intended to be consumed as a **source-included Git submodule*
 
 ## Purpose
 
-CoI AutoHelpers provides shared implementation patterns for the Kayser mod family, including localization, logging, settings, persistence, and custom keybind integration.
+CoI AutoHelpers provides shared implementation patterns for the Kayser mod family, including localization, logging, settings, and persistence infrastructure.
 
 Initial target mods:
 
@@ -41,24 +41,23 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 ## Documentation
 
-- [Developer docs](docs/dev/README.md)
+- [Helper development docs](docs/dev/README.md)
 - [Modder docs](docs/modders/README.md)
-- [Planned work](docs/dev/planned/README.md)
+- [Backlog topics](docs/dev/planned/README.md)
 - [Changelog](CHANGELOG.md)
 
-## Current implementation snapshot
+## Current scope
 
 ### Implemented
 
-- Localization: `ModTranslations` apply pipeline (load → culture selection → runtime splice → static field rebind), deferred UI refresh queue, and a deterministic English template exporter.
-- Logging: `ModLogger`, `ModConsoleLogger`, and `ModDebugHelpers` with debug-only console mirroring and `also_log_to_console` auto-registration.
-- Settings: shared `ModSettings` window with a HUD button and `Alt+M` shortcut, tab registration APIs, multi-mod coordination through a shared host object, and last-active-tab memory for the current runtime session.
-- Persistence: `ModSaveLifecycle`, save-detached vanilla attachment helpers, JSON state storage abstractions (`IModStateJsonStore`, `ModStateJsonStores`, `ModStateJsonSaveResult`), and vanilla config-backed storage.
-- Input control: `CustomKeybindsInjector` to expose custom keybindings in the game's Shortcuts UI and persist them through `PlayerPrefs`.
+- Localization: `ModTranslations` apply pipeline (load → select locale → splice → rebind), deferred UI refresh queue, deterministic English template exporter
+- Logging: `ModLogger` (prefix wrapper + startup banner), `ModConsoleLogger` (debug-only `Log.LogReceived` mirror), `ModDebugHelpers` (debug-only `also_log_to_console` auto-registration)
+- Settings: shared `ModSettings` window with HUD button and `Alt+M` shortcut; `ModSettingsTab` registration API; multi-mod coordination via a shared named game object
+- Persistence: `ModSaveLifecycle`, save-detached vanilla attachment management, JSON state storage abstractions (`IModStateJsonStore`, `ModStateJsonStores`), `IModStateJsonStore` vanilla config-backed storage
 
 ### Planned placeholders
 
-- Attribute-driven metadata helpers
+- Attribute-driven metadata
 - Console command helpers
 
 ## Design principles
@@ -72,4 +71,4 @@ Captain of Industry mods can run into assembly loading conflicts if several mods
 
 ## Repository status
 
-The helper is now implemented across localization, logging, settings, persistence, and input-control integration. The public surface is still evolving, so consuming mods should treat it as an early-stage source-included infrastructure library rather than a stable public API.
+Early development. Localization, logging, settings, and persistence subsystems are implemented and consumed by ATD, AFD, and Designer Toolkit. No stable public API yet.
