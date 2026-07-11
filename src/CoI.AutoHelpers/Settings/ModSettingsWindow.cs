@@ -10,6 +10,8 @@ namespace CoI.AutoHelpers.Settings
     {
         private readonly Column m_tabsSlot;
         private string? m_activeModId;
+        private readonly Dictionary<string, int> m_activeNestedTabOrderByModId =
+            new Dictionary<string, int>();
 
         public ModSettingsWindow(ModSettingsHostMb host)
             : base(ModSettings.Loc("Title", "Mod Settings"), false)
@@ -68,11 +70,33 @@ namespace CoI.AutoHelpers.Settings
             m_tabsSlot.Add(modTabs);
         }
 
-        private static UiComponent BuildNestedTabs(IReadOnlyList<ModSettingsTab> tabs)
+        private UiComponent BuildNestedTabs(IReadOnlyList<ModSettingsTab> tabs)
         {
             TabContainer nestedTabs = new TabContainer();
+            var orderByContent = new Dictionary<UiComponent, int>();
+            nestedTabs.OnTabActivate(() =>
+            {
+                UiComponent? activeTab = nestedTabs.ActiveTab.ValueOrNull;
+                if (activeTab != null && orderByContent.TryGetValue(activeTab, out int order))
+                    m_activeNestedTabOrderByModId[tabs[0].ModId] = order;
+            });
+
+            bool hasRememberedTab = m_activeNestedTabOrderByModId.TryGetValue(
+                tabs[0].ModId, out int rememberedOrder)
+                && tabs.Any(tab => tab.Order == rememberedOrder);
             foreach (ModSettingsTab tab in tabs)
-                nestedTabs.AddTab(tab.Title, BuildTabContent(tab), tab.IconAssetPath, null, false, false, null);
+            {
+                UiComponent content = BuildTabContent(tab);
+                orderByContent[content] = tab.Order;
+                nestedTabs.AddTab(
+                    tab.Title,
+                    content,
+                    tab.IconAssetPath,
+                    null,
+                    hasRememberedTab && tab.Order == rememberedOrder,
+                    false,
+                    null);
+            }
             return nestedTabs;
         }
 
