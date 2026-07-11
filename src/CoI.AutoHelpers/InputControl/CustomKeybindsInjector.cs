@@ -16,11 +16,11 @@ public static class CustomKeybindsInjector
     private static string s_modName = "";
     private static KbCategory s_customCategory;
 
-    public static void ApplyPatches(Harmony harmony, string modName, Type keybindsType)
+    public static void ApplyPatches(Harmony harmony, string modName, Type keybindsType, bool persistInitialBindings = false)
     {
         s_modName = modName;
-        // Allocate a pseudo-category. E.g., 100 + hash of the modName to avoid overlap
-        s_customCategory = (KbCategory)(100 + Math.Abs(modName.GetHashCode() % 1000));
+        // Allocate a stable pseudo-category so PlayerPrefs keys remain consistent across sessions.
+        s_customCategory = (KbCategory)(100 + (StableHash(modName) % 1000));
 
         s_attributes = keybindsType.GetProperties(BindingFlags.Static | BindingFlags.Public)
             .Where(x => x.GetCustomAttributes(typeof(KbAttribute), false).Length > 0)
@@ -60,6 +60,13 @@ public static class CustomKeybindsInjector
             }
 
             prop.SetValue(null, new KeyBindings(currentBinding.Mode, primary, secondary));
+        }
+
+        // A caller that supplied a legacy fallback requests a one-time migration into
+        // the native controls store. Values restored from PlayerPrefs are retained.
+        if (persistInitialBindings)
+        {
+            PersistCurrentBindings();
         }
 
         // 2. Patch UI getters
@@ -138,12 +145,41 @@ public static class CustomKeybindsInjector
         UnityEngine.PlayerPrefs.Save();
     }
 
+    private static void PersistCurrentBindings()
+    {
+        foreach (var kvp in s_attributes)
+        {
+            var binding = (KeyBindings)kvp.Key.GetValue(null);
+            var attr = kvp.Value;
+            UnityEngine.PlayerPrefs.SetString(attr.PrefsIdPrimary, binding.Primary.ToString());
+            UnityEngine.PlayerPrefs.SetString(attr.PrefsIdSecondary, binding.Secondary.ToString());
+        }
+
+        UnityEngine.PlayerPrefs.Save();
+    }
+
     private static void RestoreDefaults_Postfix()
     {
         foreach (var kvp in s_attributes)
         {
             var prop = kvp.Key;
             prop.SetValue(null, s_defaults[prop]);
+        }
+    }
+
+    private static int StableHash(string text)
+    {
+        unchecked
+        {
+            const int offset = (int)2166136261;
+            const int prime = 16777619;
+            int hash = offset;
+            for (int i = 0; i < text.Length; i++)
+            {
+                hash ^= text[i];
+                hash *= prime;
+            }
+            return hash & int.MaxValue;
         }
     }
 }
