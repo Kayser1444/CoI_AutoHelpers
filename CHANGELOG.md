@@ -8,6 +8,8 @@ The project is currently pre-release and unstable.
 
 ### Fixed
 
+- Repositioned the Mod Settings HUD button ("M") to be placed before the speed controls instead of in the middle of them.
+- Fixed the Mod Settings HUD button ("M") disappearing on subsequent game loads in the same session by checking for HUD controller changes and resetting state.
 - Added a fallback retry check 2 seconds after the initial attempt to register the settings HUD button (M), ensuring it gets added if the HUD is slow to initialize.
 
 ### Changed

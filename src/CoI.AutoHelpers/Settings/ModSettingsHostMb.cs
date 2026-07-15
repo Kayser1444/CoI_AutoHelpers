@@ -32,9 +32,17 @@ namespace CoI.AutoHelpers.Settings
             UiRoot uiRoot,
             IRootEscapeManager escapeManager)
         {
-            m_hudController = hudController;
-            m_uiRoot = uiRoot;
-            m_escapeManager = escapeManager;
+            if (m_hudController != hudController)
+            {
+                m_hudController = hudController;
+                m_uiRoot = uiRoot;
+                m_escapeManager = escapeManager;
+
+                m_buttonAdded = false;
+                m_windowOpen = false;
+                m_escapeRegistered = false;
+                m_initialized = false;
+            }
 
             if (m_window == null)
             {
@@ -189,11 +197,7 @@ namespace CoI.AutoHelpers.Settings
                 ButtonIconGlow button = new ButtonIconGlow(HUD_ICON, ToggleWindow);
                 button.Tooltip(ModSettings.Loc("OpenTooltip", "Open mod settings (Alt+M)"));
 
-                int index = best.ChildrenCount - 1;
-                if (index < 0)
-                    index = 0;
-
-                best.InsertAt(index, button, false);
+                best.InsertAt(0, button, false);
                 m_buttonAdded = true;
             }
             catch (Exception ex)
