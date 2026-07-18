@@ -63,8 +63,7 @@ namespace CoI.AutoHelpers.Settings
                     first.ModIconAssetPath ?? first.IconAssetPath,
                     null,
                     selectedTabExists && first.ModId == requestedActiveModId,
-                    true,
-                    null);
+                    true);
             }
 
             m_tabsSlot.Add(modTabs);
@@ -94,8 +93,7 @@ namespace CoI.AutoHelpers.Settings
                     tab.IconAssetPath,
                     null,
                     hasRememberedTab && tab.Order == rememberedOrder,
-                    false,
-                    null);
+                    false);
             }
             return nestedTabs;
         }

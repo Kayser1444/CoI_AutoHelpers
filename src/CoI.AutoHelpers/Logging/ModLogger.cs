@@ -78,22 +78,65 @@ namespace CoI.AutoHelpers.Logging
                     if (isEnabled)
                     {
                         UnityEngine.Debug.Log($"{m_filterTag} Debug build: also_log_to_console already enabled.");
-                        return;
                     }
-
-                    ExecuteAlsoLogToConsole(consoleCommands, m_filterTag);
-                    return;
+                    else
+                    {
+                        ExecuteAlsoLogToConsole(consoleCommands, m_filterTag);
+                    }
                 }
-
-                // Fallback for game versions where ConsoleUi internals have moved.
-                const string k_appDomainKey = "CoI.AutoHelpers.ConsoleLoggingActivated";
-                if (AppDomain.CurrentDomain.GetData(k_appDomainKey) == null)
+                else
                 {
-                    AppDomain.CurrentDomain.SetData(k_appDomainKey, true);
-                    ExecuteAlsoLogToConsole(consoleCommands, m_filterTag);
+                    // Fallback for game versions where ConsoleUi internals have moved.
+                    const string k_appDomainKey = "CoI.AutoHelpers.ConsoleLoggingActivated";
+                    if (AppDomain.CurrentDomain.GetData(k_appDomainKey) == null)
+                    {
+                        AppDomain.CurrentDomain.SetData(k_appDomainKey, true);
+                        ExecuteAlsoLogToConsole(consoleCommands, m_filterTag);
+                    }
                 }
 #endif
+                LogHarmonyRuntimeOnce(m_filterTag);
             });
+        }
+
+        private static void LogHarmonyRuntimeOnce(string logTag)
+        {
+            const string k_appDomainKey = "CoI.AutoHelpers.HarmonyRuntimeLogged";
+            if (AppDomain.CurrentDomain.GetData(k_appDomainKey) != null)
+                return;
+
+            AppDomain.CurrentDomain.SetData(k_appDomainKey, true);
+
+            Assembly? harmonyAssembly = null;
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (string.Equals(assembly.GetName().Name, "0Harmony", StringComparison.OrdinalIgnoreCase))
+                {
+                    harmonyAssembly = assembly;
+                    break;
+                }
+            }
+
+            if (harmonyAssembly == null)
+            {
+                Log.Warning($"{logTag} Harmony runtime: 0Harmony assembly is not loaded.");
+                return;
+            }
+
+            string version = harmonyAssembly.GetName().Version?.ToString() ?? "<unknown>";
+            string location;
+            try
+            {
+                location = string.IsNullOrWhiteSpace(harmonyAssembly.Location)
+                    ? "<no location>"
+                    : harmonyAssembly.Location;
+            }
+            catch
+            {
+                location = "<unavailable>";
+            }
+
+            Log.Info($"{logTag} Harmony runtime: {version} | dll: {location}");
         }
 
         internal static bool TryGetVanillaConsoleLoggingEnabled(GameConsoleCommandsExecutor consoleCommands, out bool enabled)
