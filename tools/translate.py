@@ -50,6 +50,7 @@ VANILLA_LANG_MAP = {
 }
 
 WORK_ORDER_FILENAME = "work-order.json"
+SOURCE_STRINGS_FILENAME = ".source-strings.json"
 
 
 # ------------------------------------------------------------------ #
@@ -221,6 +222,47 @@ def write_translation_json(path: Path, entries: list[list[str]]) -> None:
     lines.append("]")
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write("\r\n".join(lines))
+
+
+def load_source_strings(translations_dir: Path) -> dict[str, str]:
+    """Load the English source values used for the last completed translation pass."""
+    path = translations_dir / SOURCE_STRINGS_FILENAME
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data if isinstance(data, dict) else {}
+
+
+def update_source_strings(mod_dir: Path) -> None:
+    """Record source strings whose translations are complete for future change detection."""
+    cs_path = find_localization_cs(mod_dir)
+    loc_strings = parse_loc_strings(cs_path)
+    skip_keys = load_skip_keys(mod_dir)
+    translations_dir = mod_dir / "translations"
+    source_strings = load_source_strings(translations_dir)
+    translations = {}
+    for lang in SUPPORTED_LANGS:
+        lang_path = translations_dir / f"{lang}.json"
+        if not lang_path.exists():
+            return
+        translations[lang] = translation_to_dict(load_translation_json(lang_path))
+
+    updated = 0
+    for key, en_val, _ in loc_strings:
+        if key in skip_keys:
+            continue
+        if all(translations[lang].get(key) not in (None, "", en_val)
+                for lang in SUPPORTED_LANGS):
+            if source_strings.get(key) != en_val:
+                source_strings[key] = en_val
+                updated += 1
+
+    path = translations_dir / SOURCE_STRINGS_FILENAME
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(source_strings, f, indent=2, ensure_ascii=False, sort_keys=True)
+        f.write("\n")
+    print(f"  Recorded {updated} updated English source value(s) in {path.name}")
 
 
 # ------------------------------------------------------------------ #
@@ -468,6 +510,7 @@ def cmd_extract(mod_dir: Path, output: Path | None) -> None:
     loc_strings = parse_loc_strings(cs_path)
     skip_keys = load_skip_keys(mod_dir)
     translations_dir = mod_dir / "translations"
+    source_strings = load_source_strings(translations_dir)
 
     work_order: dict = {
         "mod": mod_dir.name,
@@ -486,8 +529,13 @@ def cmd_extract(mod_dir: Path, output: Path | None) -> None:
         if context:
             entry["context"] = context
         needs_any = False
+        source_changed = key in source_strings and source_strings[key] != en_val
 
         for lang in SUPPORTED_LANGS:
+            if source_changed:
+                entry[lang] = None
+                needs_any = True
+                continue
             lang_path = translations_dir / f"{lang}.json"
             if not lang_path.exists():
                 entry[lang] = None
@@ -520,6 +568,8 @@ def cmd_extract(mod_dir: Path, output: Path | None) -> None:
             count = sum(1 for e in work_order["keys"].values() if e.get(lang) is None)
             if count > 0:
                 print(f"  {lang}: {count} keys")
+    if not source_strings:
+        print(f"No {SOURCE_STRINGS_FILENAME} baseline yet; it will be created after a completed apply pass.")
 
 
 def cmd_translate_work_order(mod_dir: Path, wo_path: Path | None) -> None:
@@ -604,6 +654,8 @@ def cmd_apply(mod_dir: Path, input_path: Path | None) -> None:
         if updated > 0:
             print(f"  {lang}: applied {updated} translations")
 
+    update_source_strings(mod_dir)
+
 
 def cmd_sync(mod_dir: Path) -> None:
     """Reorder all language JSONs to match C# source key order."""
@@ -638,6 +690,7 @@ def cmd_status(mod_dir: Path) -> None:
     loc_strings = parse_loc_strings(cs_path)
     skip_keys = load_skip_keys(mod_dir)
     translations_dir = mod_dir / "translations"
+    source_strings = load_source_strings(translations_dir)
     total = len(loc_strings)
     skipped = sum(1 for k, _, _ in loc_strings if k in skip_keys)
     translatable = total - skipped
@@ -649,6 +702,13 @@ def cmd_status(mod_dir: Path) -> None:
     print(f"{'=' * 60}")
     print(f"  {'Lang':<6} {'Translated':>12} {'Untranslated':>14} {'Coverage':>10}")
     print(f"  {'-' * 46}")
+
+    changed_source_keys = [key for key, en_val, _ in loc_strings
+                           if key not in skip_keys
+                           and key in source_strings
+                           and source_strings[key] != en_val]
+    if changed_source_keys:
+        print(f"  English source changes awaiting translation: {len(changed_source_keys)}")
 
     for lang in SUPPORTED_LANGS:
         lang_path = translations_dir / f"{lang}.json"
