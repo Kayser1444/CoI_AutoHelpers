@@ -39,7 +39,9 @@ namespace CoI.AutoHelpers.Localization
                 return new TranslationLoadResult(bundles, diagnostics);
             }
 
-            string[] jsonFiles = Directory.GetFiles(translationsDirectory, "*.json", SearchOption.TopDirectoryOnly);
+            string[] jsonFiles = Array.FindAll(
+                Directory.GetFiles(translationsDirectory, "*.json", SearchOption.TopDirectoryOnly),
+                filePath => !Path.GetFileName(filePath).StartsWith(".", StringComparison.Ordinal));
             Array.Sort(jsonFiles, StringComparer.OrdinalIgnoreCase);
 
             foreach (string filePath in jsonFiles)
