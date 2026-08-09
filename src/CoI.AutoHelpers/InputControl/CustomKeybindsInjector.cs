@@ -6,6 +6,7 @@ using HarmonyLib;
 using Mafi;
 using Mafi.Unity;
 using Mafi.Unity.InputControl;
+using UnityEngine;
 
 namespace CoI.AutoHelpers.InputControl;
 
@@ -28,6 +29,8 @@ public static class CustomKeybindsInjector
             .ToArray();
 
         if (s_attributes.Length == 0) return;
+
+        PatchVanillaKeyBinder(harmony);
 
         // Ensure all registered attributes use the custom category
         foreach (var kvp in s_attributes)
@@ -100,6 +103,66 @@ public static class CustomKeybindsInjector
     private static void GetCategories_Postfix(ref IEnumerable<KeyValuePair<KbCategory, Mafi.Localization.LocStrFormatted>> __result)
     {
         __result = __result.Concat(new[] { new KeyValuePair<KbCategory, Mafi.Localization.LocStrFormatted>(s_customCategory, new Mafi.Localization.LocStrFormatted(s_modName + " (Mod)")) });
+    }
+
+    /// <summary>
+    /// Returns the logical keyboard state used while recording or evaluating a
+    /// binding. On layouts with AltGr, Unity can expose one physical Right Alt
+    /// press as RightAlt + AltGr + LeftControl. AltGr and its synthetic Ctrl
+    /// must not become separate binding keys.
+    /// </summary>
+    public static bool IsLogicalKeyDown(KeyCode key)
+    {
+        if (key == KeyCode.AltGr)
+            return false;
+
+        if (key == KeyCode.LeftControl && UnityEngine.Input.GetKey(KeyCode.AltGr))
+            return false;
+
+        return UnityEngine.Input.GetKey(key);
+    }
+
+    public static bool IsLogicalKeyDownThisFrame(KeyCode key)
+    {
+        if (key == KeyCode.AltGr)
+            return false;
+
+        if (key == KeyCode.LeftControl && UnityEngine.Input.GetKey(KeyCode.AltGr))
+            return false;
+
+        return UnityEngine.Input.GetKeyDown(key);
+    }
+
+    private static void PatchVanillaKeyBinder(Harmony harmony)
+    {
+        Type? controlsTabType = AccessTools.TypeByName("Mafi.Unity.InputControl.GameMenu.Settings.ControlsTab");
+        Type? keyBinderType = controlsTabType?.GetNestedType("KeyBinder", BindingFlags.NonPublic);
+        MethodInfo? inputUpdate = keyBinderType == null ? null : AccessTools.Method(keyBinderType, "InputUpdate");
+        if (inputUpdate == null)
+            return;
+
+        harmony.Patch(
+            inputUpdate,
+            transpiler: new HarmonyMethod(typeof(CustomKeybindsInjector), nameof(ControlsTabKeyBinderInputUpdate_Transpiler)));
+    }
+
+    private static IEnumerable<CodeInstruction> ControlsTabKeyBinderInputUpdate_Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        MethodInfo? getKey = AccessTools.Method(typeof(UnityEngine.Input), nameof(UnityEngine.Input.GetKey), new[] { typeof(KeyCode) });
+        MethodInfo? logicalGetKey = AccessTools.Method(typeof(CustomKeybindsInjector), nameof(IsLogicalKeyDown));
+        if (getKey == null || logicalGetKey == null)
+        {
+            foreach (CodeInstruction instruction in instructions)
+                yield return instruction;
+            yield break;
+        }
+
+        foreach (CodeInstruction instruction in instructions)
+        {
+            if (instruction.Calls(getKey))
+                instruction.operand = logicalGetKey;
+            yield return instruction;
+        }
     }
 
     private static void GetKeybindings_Postfix(KbCategory category, IMain main, ref IEnumerable<KeyValuePair<PropertyInfo, KbAttribute>> __result)

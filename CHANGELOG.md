@@ -8,6 +8,7 @@ The project is currently pre-release and unstable.
 
 ### Fixed
 
+- Normalized AltGr keyboard input so Right Alt is not recorded as synthetic Ctrl + RightAlt + AltGr in custom keybindings.
 - Excluded dot-prefixed translation metadata files from runtime localization scans; they are tooling sources, not locale bundles.
 - Repositioned the Mod Settings HUD button ("M") to be placed before the speed controls instead of in the middle of them.
 - Fixed the Mod Settings HUD button ("M") disappearing on subsequent game loads in the same session by checking for HUD controller changes and resetting state.
