@@ -387,7 +387,7 @@ Important: this type is only a model container. It does not serialize itself. Us
 
 ## Vanilla Config JSON Storage
 
-For small per-save state, the recommended storage path is a single string parameter in vanilla `ModJsonConfig`. Vanilla stores that value in the save file's config chunk. In testing, the stored config remains in the save even after the mod is removed and the save is re-saved without the mod.
+For small per-save state, the recommended storage path is a single string parameter in vanilla `ModJsonConfig`. Vanilla stores that value in the save file's config chunk while the mod remains present. Testing shows that loading and re-saving a world while the mod is absent purges or resets that mod's cached config; reinstalling the mod then presents its `config.json` parameters as first-time configuration. Do not use this storage to carry state across gameplay saved while the mod was absent.
 
 Define one internal string parameter in your mod's `config.json`:
 
