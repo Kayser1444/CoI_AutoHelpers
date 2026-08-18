@@ -133,6 +133,44 @@ public static class CustomKeybindsInjector
         return UnityEngine.Input.GetKeyDown(key);
     }
 
+    /// <summary>
+    /// Recreates the registered key-binding attributes after a mod has injected
+    /// its translation bundle. KbAttribute snapshots its title and tooltip in
+    /// the constructor, while custom keybinds are discovered before late mod
+    /// localization normally runs.
+    /// </summary>
+    public static int RefreshRegisteredLocalizations()
+    {
+        if (s_attributes.Length == 0)
+            return 0;
+
+        var refreshed = new KeyValuePair<PropertyInfo, KbAttribute>[s_attributes.Length];
+        for (int i = 0; i < s_attributes.Length; i++)
+        {
+            KeyValuePair<PropertyInfo, KbAttribute> current = s_attributes[i];
+            KbAttribute attribute = current.Value;
+            string? tooltip = attribute.Tooltip.HasValue
+                ? attribute.Tooltip.Value.TranslatedString
+                : null;
+            string? requiredDlc = attribute.RequiredDlc.IsNone
+                ? null
+                : attribute.RequiredDlc.Value;
+
+            KbAttribute rebound = new KbAttribute(
+                attribute.Category,
+                attribute.GroupId,
+                attribute.Title.Value,
+                tooltip,
+                attribute.IgnoreConflicts,
+                attribute.IsPrimaryReadonly,
+                requiredDlc);
+            refreshed[i] = new KeyValuePair<PropertyInfo, KbAttribute>(current.Key, rebound);
+        }
+
+        s_attributes = refreshed;
+        return refreshed.Length;
+    }
+
     private static void PatchVanillaKeyBinder(Harmony harmony)
     {
         Type? controlsTabType = AccessTools.TypeByName("Mafi.Unity.InputControl.GameMenu.Settings.ControlsTab");
