@@ -67,7 +67,7 @@ def find_localization_cs(mod_dir: Path) -> Path:
 
 
 def parse_loc_strings(cs_path: Path) -> list[tuple[str, str, str | None]]:
-    """Parse Loc.Str() and Loc.Str1() calls from C# source."""
+    """Parse Loc.Str(), Loc.Str1(), Loc.Str2(), and Loc.Str3() calls from C# source."""
     content = cs_path.read_text(encoding="utf-8")
     results = []
     length = len(content)
@@ -185,6 +185,8 @@ def parse_loc_strings(cs_path: Path) -> list[tuple[str, str, str | None]]:
         matches = [
             (content.find("Loc.Str(", idx), "Loc.Str("),
             (content.find("Loc.Str1(", idx), "Loc.Str1("),
+            (content.find("Loc.Str2(", idx), "Loc.Str2("),
+            (content.find("Loc.Str3(", idx), "Loc.Str3("),
         ]
         matches = [(position, call) for position, call in matches if position != -1]
         if not matches:

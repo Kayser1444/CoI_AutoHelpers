@@ -17,6 +17,7 @@ The project is currently pre-release and unstable.
 
 ### Changed
 
+- Verified compatibility with Captain of Industry 0.8.7d (build 619).
 - Simplified `ModLogger` construction to tag-only usage (`new ModLogger("TAG")`), removing the older `modId`, `manifestVersion`, and `modAssembly` parameters.
 - Removed `LogStartupBanner()`. Consuming mods should now emit their own startup banner in a renderer-init callback and use `ModLogger.GetDllBuildTimestamp` when they want DLL timestamp details.
 - Promoted `GetDllBuildTimestamp` to `public static`; timestamp fallbacks now report local time without a UTC suffix.
