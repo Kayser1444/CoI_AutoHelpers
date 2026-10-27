@@ -2,6 +2,13 @@
 function Build-CoIVersionSwitchingPackageInputs {
     param([string]$ModId,[string]$Configuration,[string]$LegacyManagedPath,[string]$CurrentManagedPath)
     $helpersRoot=Split-Path -Parent $PSScriptRoot
+    # Consuming projects reach AH through external/CoI_AutoHelpers junctions.
+    # Resolve that junction before looking for sibling projects/reference snapshots.
+    $helpersItem=Get-Item -LiteralPath $helpersRoot -Force
+    if($helpersItem.LinkType -and $helpersItem.Target){
+        $target=@($helpersItem.Target)[0]
+        $helpersRoot=if([IO.Path]::IsPathRooted($target)){$target}else{Join-Path (Split-Path -Parent $helpersRoot) $target}
+    }
     if(-not $LegacyManagedPath){$LegacyManagedPath=$env:COI_LEGACY_MANAGED_PATH}
     if(-not $CurrentManagedPath){$CurrentManagedPath=$env:CAPTAIN_INDUSTRY_MANAGED_PATH}
     if(-not $CurrentManagedPath){$CurrentManagedPath='C:\Program Files (x86)\Steam\steamapps\common\Captain of Industry\Captain of Industry_Data\Managed'}
