@@ -31,9 +31,16 @@ foreach($project in $ModIds){
     if($LASTEXITCODE -ne 0){throw "Selector build failed: $project"}
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "VersionSelector\bin\$Configuration\net48\$project.Loader.dll") -Destination $output
     Copy-Item -LiteralPath (Join-Path $repo "bin\$Configuration\net48\0Harmony.dll") -Destination $output
-    $manifest=Get-Content -LiteralPath (Join-Path $repo 'manifest.json') -Raw|ConvertFrom-Json
-    $manifest.primary_dlls=@('0Harmony.dll',"$project.Loader.dll")
-    $manifest|ConvertTo-Json -Depth 20|Set-Content -LiteralPath (Join-Path $output 'manifest.json') -Encoding utf8
+    $manifestPath=Join-Path $repo 'manifest.json'
+    $manifest=Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8|ConvertFrom-Json
+    $primaryDlls=@('0Harmony.dll',"$project.Loader.dll")
+    if(($manifest.primary_dlls -join '|') -eq ($primaryDlls -join '|')){
+        # Keep reviewed metadata bytes, including non-ASCII descriptions, intact.
+        Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $output 'manifest.json') -Force
+    }else{
+        $manifest.primary_dlls=$primaryDlls
+        [IO.File]::WriteAllText((Join-Path $output 'manifest.json'),($manifest|ConvertTo-Json -Depth 20),[Text.UTF8Encoding]::new($false))
+    }
 }
 # Finish every build before altering an installed manifest.
 if($Deploy){
