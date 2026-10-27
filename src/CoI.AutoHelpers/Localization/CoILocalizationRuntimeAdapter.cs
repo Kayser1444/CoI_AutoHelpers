@@ -101,14 +101,13 @@ namespace CoI.AutoHelpers.Localization
             MethodInfo strMethod = ResolveMethod(localizationManagerType, "GetLocalizedString0Arg", typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
             MethodInfo str1Method = ResolveMethod(localizationManagerType, "GetLocalizedString1Arg", typeof(string), typeof(string), typeof(string), typeof(bool), typeof(bool));
             MethodInfo str1PluralMethod = ResolveMethod(localizationManagerType, "GetLocalizedString1Arg", typeof(string), typeof(string), typeof(string), typeof(string));
-            MethodInfo str2Method = ResolveMethod(locType, "Str2", typeof(string), typeof(string), typeof(string));
-            MethodInfo str3Method = ResolveMethod(locType, "Str3", typeof(string), typeof(string), typeof(string));
-            MethodInfo str4Method = ResolveMethod(locType, "Str4", typeof(string), typeof(string), typeof(string));
-
             HashSet<string> translationKeys = new HashSet<string>(StringComparer.Ordinal);
+            Dictionary<string, TranslationEntry> translationsByKey =
+                new Dictionary<string, TranslationEntry>(StringComparer.Ordinal);
             foreach (TranslationEntry entry in bundle.Entries)
             {
                 translationKeys.Add(entry.Key);
+                translationsByKey[entry.Key] = entry;
             }
 
             List<TranslationDiagnostic> diagnostics = new List<TranslationDiagnostic>();
@@ -189,8 +188,12 @@ namespace CoI.AutoHelpers.Localization
                             continue;
                         }
 
-                        string fallback = GetOptionalStringField(currentValue, "m_translatedString") ?? "{0}{1}";
-                        reboundValue = str2Method.Invoke(null, new object[] { id, fallback, RebindComment });
+                        if (translationsByKey.TryGetValue(id, out TranslationEntry translation2))
+                        {
+                            reboundValue = Activator.CreateInstance(
+                                locStr2Type,
+                                new object[] { id, translation2.SingularText, RebindComment });
+                        }
                     }
                     else if (fieldType == locStr3Type)
                     {
@@ -199,8 +202,12 @@ namespace CoI.AutoHelpers.Localization
                             continue;
                         }
 
-                        string fallback = GetOptionalStringField(currentValue, "m_translatedString") ?? "{0}{1}{2}";
-                        reboundValue = str3Method.Invoke(null, new object[] { id, fallback, RebindComment });
+                        if (translationsByKey.TryGetValue(id, out TranslationEntry translation3))
+                        {
+                            reboundValue = Activator.CreateInstance(
+                                locStr3Type,
+                                new object[] { id, translation3.SingularText, RebindComment });
+                        }
                     }
                     else if (fieldType == locStr4Type)
                     {
@@ -209,15 +216,14 @@ namespace CoI.AutoHelpers.Localization
                             continue;
                         }
 
-                        string fallback = GetOptionalStringField(currentValue, "m_translatedString") ?? "{0}{1}{2}{3}";
-                        reboundValue = str4Method.Invoke(null, new object[] { id, fallback, RebindComment });
+                        if (translationsByKey.TryGetValue(id, out TranslationEntry translation4))
+                        {
+                            reboundValue = Activator.CreateInstance(
+                                locStr4Type,
+                                new object[] { id, translation4.SingularText, RebindComment });
+                        }
                     }
                     else
-                    {
-                        continue;
-                    }
-
-                    if (reboundValue == null)
                     {
                         continue;
                     }
@@ -231,6 +237,11 @@ namespace CoI.AutoHelpers.Localization
                             TranslationDiagnosticSeverity.Warning,
                             type.FullName ?? modAssembly.GetName().Name ?? "<unknown>",
                             $"No translation entry exists for key '{id}' on field '{field.Name}'."));
+                        continue;
+                    }
+
+                    if (reboundValue == null)
+                    {
                         continue;
                     }
 

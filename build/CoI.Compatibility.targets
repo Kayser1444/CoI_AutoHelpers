@@ -1,0 +1,27 @@
+<Project>
+  <!-- PRE_4_3_COMPAT: API selector only; retire with legacy branches after Update 5 or when pre-4.3 support ends. -->
+  <Target Name="DetectCaptainIndustryApi" BeforeTargets="CoreCompile">
+    <GetAssemblyIdentity AssemblyFiles="$(CaptainIndustryManagedPath)\Mafi.dll">
+      <Output TaskParameter="Assemblies" ItemName="_CoIGameAssembly" />
+    </GetAssemblyIdentity>
+    <PropertyGroup>
+      <_CoIGameVersion>@(_CoIGameAssembly->'%(Version)')</_CoIGameVersion>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(_CoIGameVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(_CoIGameVersion)', '0.8.8.0'))">
+      <DefineConstants>$(DefineConstants);COI_UPDATE_4_3</DefineConstants>
+    </PropertyGroup>
+  </Target>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)..\src\CoI.AutoHelpers\Compatibility\*.cs"
+             Link="CoI.AutoHelpers\Compatibility\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- Keep an installed selector's matching payload current on normal developer builds. -->
+  <Target Name="UpdateSelectedModPayload" AfterTargets="CopyModFilesToProjectRoot"
+          Condition="'$(SkipModDeployment)' != 'true' and Exists('$(ProjectDir)$(AssemblyName).Loader.dll')">
+    <PropertyGroup>
+      <_CoIPayloadBranch Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(_CoIGameVersion)', '0.8.8.0'))">update-4.3</_CoIPayloadBranch>
+      <_CoIPayloadBranch Condition="'$(_CoIPayloadBranch)' == ''">pre-update-4.3</_CoIPayloadBranch>
+    </PropertyGroup>
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)implementations\$(_CoIPayloadBranch)" />
+  </Target>
+</Project>

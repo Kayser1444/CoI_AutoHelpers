@@ -6,8 +6,21 @@ The project is currently pre-release and unstable.
 
 ## [Unreleased]
 
+- Added an experimental shared game-version selector and dual-build/deploy script. One installed manifest loads the matching 0.8.7d/0.8.8 implementation while handing its original entry type and assembly list to native discovery. Actual native-loader proofs pass on both reference sets; all eight implementation builds and reference checks pass. The owner subsequently confirmed game/save loading on both versions; extensive playtesting remains.
+
+- Marked pre-Update 4.3 compatibility branches and runtime fallbacks with searchable `PRE_4_3_COMPAT` retirement notes: remove after Update 5 or when older-game support ends. Added an installed-reference check that reproduces newer DLLs failing on stable and verifies matching game assembly versions/types/members after rebuilding.
+
+- Corrected the native Update 4.3 Controls column threshold for owners with one shortcut. Apply the UI patch once across source-consuming mods; preserve native balancing for larger sets and all shortcut IDs/bindings. A regression executes the actual native arithmetic/branch before and after the production transpiler.
+
+- Added `ModDebugWebApi.Register` to start the native local web API automatically in Debug games after renderer initialization, during sync. All four maintained mods register it alongside console mirroring. Existing servers keep their port, startup failures warn without aborting loading, Release/pre-4.3 builds do nothing, and persistent machine settings are unchanged. Added lifecycle and build-gating contracts.
+
+- Added assembly-version-selected Update 4.3 source paths, native mod shortcut registration, runtime UI audio fallbacks and a transient plain-buffer adapter. Added audio/metadata contracts; all five Debug builds pass against both 0.8.8 build 622 and stable 0.8.7d build 619. Full stable-game startup/gameplay remains pending.
+
+- Added opt-in, per-mod runtime log levels (Warning/Info/Debug/Trace), atomic cross-thread publication, configured defaults and session overrides to ModLogger. Existing tag-only consumers retain their behavior.
+
 ### Fixed
 
+- Rebound translated `LocStr2`, `LocStr3`, and `LocStr4` fields from the selected bundle directly, avoiding duplicate-ID errors when the same static keys were already registered.
 - Translation extraction now recognizes `Loc.Str1` placeholder strings alongside `Loc.Str` strings.
 - Normalized AltGr keyboard input so Right Alt is not recorded as synthetic Ctrl + RightAlt + AltGr in custom keybindings.
 - Excluded dot-prefixed translation metadata files from runtime localization scans; they are tooling sources, not locale bundles.
@@ -16,6 +29,9 @@ The project is currently pre-release and unstable.
 - Added a fallback retry check 2 seconds after the initial attempt to register the settings HUD button (M), ensuring it gets added if the HUD is slow to initialize.
 
 ### Changed
+
+- Verified compatibility with Captain of Industry 0.8.8 (build 622).
+- Replaced Gemini/Google translation requests with offline work-order preparation for translation and contextual review in the current agent harness. `run` now stops before applying translations.
 
 - Verified compatibility with Captain of Industry 0.8.7d (build 619).
 - Simplified `ModLogger` construction to tag-only usage (`new ModLogger("TAG")`), removing the older `modId`, `manifestVersion`, and `modAssembly` parameters.

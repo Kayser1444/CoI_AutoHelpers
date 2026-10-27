@@ -25,6 +25,7 @@ namespace CoI.AutoHelpers.Logging
     /// </summary>
     public sealed class ModLogger
     {
+        private readonly ModLogLevels? m_levels;
         private readonly string m_prefix;    // "[AFD] "
         private readonly string m_filterTag; // "[AFD]"
 
@@ -32,17 +33,22 @@ namespace CoI.AutoHelpers.Logging
         /// Creates a logger for the given mod tag.
         /// </summary>
         /// <param name="modTag">Short log tag, e.g. <c>"AFD"</c>. Wrapped in brackets for every log line.</param>
-        public ModLogger(string modTag)
+        public ModLogger(string modTag, ModLogLevels? levels = null)
         {
             if (string.IsNullOrWhiteSpace(modTag))
                 throw new ArgumentException("Mod tag must be non-empty.", nameof(modTag));
 
+            m_levels = levels;
             m_prefix = $"[{modTag}] ";
             m_filterTag = $"[{modTag}]";
         }
 
         /// <summary>Logs an info message.</summary>
-        public void Info(string message) => Log.Info(m_prefix + message);
+        public bool IsEnabled(ModLogLevel level) => m_levels?.IsEnabled(level) ?? level <= ModLogLevel.Info;
+
+        public void Info(string message) { if (IsEnabled(ModLogLevel.Info)) Log.Info(m_prefix + message); }
+        public void Debug(string message) { if (IsEnabled(ModLogLevel.Debug)) Log.Info(m_prefix + "[Debug] " + message); }
+        public void Trace(string message) { if (IsEnabled(ModLogLevel.Trace)) Log.Info(m_prefix + "[Trace] " + message); }
 
         /// <summary>Logs a warning.</summary>
         public void Warning(string message) => Log.Warning(m_prefix + message);

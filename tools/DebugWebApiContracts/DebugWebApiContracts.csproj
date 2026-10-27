@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NuGetAudit>false</NuGetAudit>
+    <EnableCurrentApi Condition="'$(EnableCurrentApi)' == ''">true</EnableCurrentApi>
+    <DefineConstants Condition="'$(EnableCurrentApi)' == 'true'">$(DefineConstants);COI_UPDATE_4_3</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/CoI.AutoHelpers/Logging/ModDebugWebApi.cs" Link="ModDebugWebApi.cs" />
+  </ItemGroup>
+</Project>

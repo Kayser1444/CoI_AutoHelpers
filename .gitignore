@@ -1,4 +1,6 @@
 # Build outputs
+artifacts/
+**/__pycache__/
 **/bin/
 **/obj/
 

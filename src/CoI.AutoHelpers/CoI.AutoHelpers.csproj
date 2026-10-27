@@ -47,4 +47,5 @@ released Captain of Industry mods should still consume the helper as source.
     </Reference>
   </ItemGroup>
 
+  <Import Project="..\..\build\CoI.Compatibility.targets" />
 </Project>
