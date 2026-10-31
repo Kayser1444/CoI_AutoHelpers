@@ -6,13 +6,15 @@ The project is currently pre-release and unstable.
 
 ## [Unreleased]
 
+- Make translation preparation offline and agent-driven, with local vanilla terminology hints and French support when that locale exists. Do not apply or synchronize unfinished work automatically; preserve completed values and leave absent locales alone.
+
 - Added an experimental shared game-version selector and dual-build/deploy script. One installed manifest loads the matching 0.8.7d/0.8.8 implementation while handing its original entry type and assembly list to native discovery. Actual native-loader proofs pass on both reference sets; all eight implementation builds and reference checks pass. The owner subsequently confirmed game/save loading on both versions; extensive playtesting remains.
 
 - Marked pre-Update 4.3 compatibility branches and runtime fallbacks with searchable `PRE_4_3_COMPAT` retirement notes: remove after Update 5 or when older-game support ends. Added an installed-reference check that reproduces newer DLLs failing on stable and verifies matching game assembly versions/types/members after rebuilding.
 
 - Corrected the native Update 4.3 Controls column threshold for owners with one shortcut. Apply the UI patch once across source-consuming mods; preserve native balancing for larger sets and all shortcut IDs/bindings. A regression executes the actual native arithmetic/branch before and after the production transpiler.
 
-- Added `ModDebugWebApi.Register` to start the native local web API automatically in Debug games after renderer initialization, during sync. All four maintained mods register it alongside console mirroring. Existing servers keep their port, startup failures warn without aborting loading, Release/pre-4.3 builds do nothing, and persistent machine settings are unchanged. Added lifecycle and build-gating contracts.
+- Removed automatic web API startup from AutoHelpers and all four consuming mods. Test launches now use `--exec-command 0 "web_api_start"` together with `--flush-after-each-log --full-flush-logs`. Keep early `also_log_to_console` setup for manual version/DLL-timestamp checks; remove the obsolete API-startup fixtures and require the helper's absence in installed-reference contracts.
 
 - Added assembly-version-selected Update 4.3 source paths, native mod shortcut registration, runtime UI audio fallbacks and a transient plain-buffer adapter. Added audio/metadata contracts; all five Debug builds pass against both 0.8.8 build 622 and stable 0.8.7d build 619. Full stable-game startup/gameplay remains pending.
 

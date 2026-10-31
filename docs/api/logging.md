@@ -6,21 +6,22 @@ Create one `ModLogLevels` per mod and pass it to each `ModLogger(tag, levels)`. 
 
 `Level`, `ConfiguredLevel`, `IsEnabled` and `Describe` read atomically published immutable state. Mutations are synchronized; independent policy instances do not affect each other. Guard expensive message construction with `IsEnabled` at the call site. Messages already passed as strings have already incurred their formatting cost.
 
-## Debug web API startup
+## Console mirroring and game launch logging
 
-Call `ModDebugWebApi.Register(this, resolver, "[TAG]")` in `IMod.Initialize`,
-alongside console mirroring. ATD, AFD, BDT and KPIE do this automatically.
+Keep `RegisterAutoConsoleMirroring` in `IMod.Initialize`. Its Debug-only
+`also_log_to_console` setup runs early enough to show version and DLL timestamp
+rows during manual testing.
 
-In Debug builds against CoI 0.8.8 or newer, this registers a renderer-init
-callback that defers startup to the next synchronization point. It starts the
-native loopback-only server on port 3073 and logs its base URL and `/routes`.
-Multiple source-consuming mods check the same native server, so an already
-running server keeps its port. A failed start emits a warning without aborting
-game initialization.
+Web API startup belongs to the test launcher, not AutoHelpers. For CoI 0.8.8
+(Update 4.3), launch the game with:
 
-Each game load registers independently; no process-wide flag suppresses later
-worlds. `web_api_stop` can stop the server for the rest of the current game.
-Automatic startup does not change the game's persistent API setting. Release
-calls are omitted by `[Conditional("DEBUG")]`; the pre-4.3 implementation is a
-no-op and does not reference the newer web API types. Consuming builds use the
-shared `CoI.Compatibility.targets` API-version detection.
+```text
+"C:\Program Files (x86)\Steam\steamapps\common\Captain of Industry\Captain of Industry.exe" --flush-after-each-log --full-flush-logs --launch-last-game --exec-command 0 "web_api_start"
+```
+
+The native command starts the loopback API on port 3073 without changing its
+persistent machine setting. `/routes` lists endpoints and `/commands` lists
+input commands accepted by `POST /command`; this is not a general console
+command endpoint. Both flush flags keep live log reads current and minimize
+buffered log loss on a crash, at a performance cost. A hard crash can still
+interrupt a log entry before it is written.

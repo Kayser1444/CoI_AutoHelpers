@@ -7,11 +7,11 @@ Usage:
 
 Commands:
     extract   - Extract untranslated/changed keys into a work-order JSON
-    translate - Automatically translate empty/untranslated keys in the work-order
+    translate - Prepare work-order references for translation in the agent harness
     apply     - Apply translations from a completed work-order JSON
     sync      - Reorder all language JSONs to match C# source key order
     status    - Print translation coverage summary for each language
-    run       - Execute the entire pipeline (extract -> translate -> apply -> sync)
+    run       - Extract and prepare work for translation in the agent harness
     glossary  - Generate vanilla game translation glossary files
 
 The --mod argument accepts a mod directory name (e.g. DesignerToolkit) or path.
@@ -21,17 +21,13 @@ a src/*Localization*.cs file in parent directories.
 
 import argparse
 import json
-import os
 import sys
-import urllib.request
-import urllib.parse
-import time
 from pathlib import Path
 
 # ------------------------------------------------------------------ #
 # Constants
 # ------------------------------------------------------------------ #
-SUPPORTED_LANGS = ["de", "es", "it", "pt", "ru", "sv", "zh"]
+SUPPORTED_LANGS = ["de", "es", "fr", "it", "pt", "ru", "sv", "zh"]
 FRAMEWORK_DIR = Path(__file__).resolve().parent
 MODS_DIR = FRAMEWORK_DIR.parent.parent  # tools -> CoI_AutoHelpers -> Mods
 VANILLA_TRANSLATIONS_DIR = Path(
@@ -42,6 +38,7 @@ VANILLA_TRANSLATIONS_DIR = Path(
 VANILLA_LANG_MAP = {
     "de": "de.json",
     "es": "es.json",
+    "fr": "fr.json",
     "it": "it.json",
     "pt": "pt_BR.json",
     "ru": "ru.json",
@@ -325,7 +322,7 @@ def resolve_mod_dir(mod_arg: str | None) -> Path:
 
 
 # ------------------------------------------------------------------ #
-# Auto-Translation Logic
+# Local terminology references
 # ------------------------------------------------------------------ #
 _vanilla_cache = {}
 
@@ -396,116 +393,6 @@ def get_vanilla_glossary(target_lang: str, english_text: str) -> dict[str, str]:
                 reference[val_clean] = translated
                 
     return reference
-
-
-def translate_via_gemini(text: str, target_lang: str, context: str | None, key: str) -> str | None:
-    """Translate text using Gemini 1.5 Flash API via REST request."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return None
-        
-    # 1. Fetch vanilla references
-    references = get_vanilla_glossary(target_lang, text)
-    ref_str = ""
-    if references:
-        ref_str = "\nFor consistency with the base game, use these official translations where appropriate:\n"
-        for en_ref, tr_ref in references.items():
-            ref_str += f'- "{en_ref}" -> "{tr_ref}"\n'
-            
-    # 2. Build prompt
-    lang_names = {
-        "de": "German",
-        "es": "Spanish",
-        "it": "Italian",
-        "pt": "Portuguese",
-        "ru": "Russian",
-        "sv": "Swedish",
-        "zh": "Simplified Chinese",
-    }
-    target_lang_name = lang_names.get(target_lang, target_lang)
-    
-    prompt = f"""You are a professional localizer for the colony-builder and automation game "Captain of Industry".
-Translate the following mod localization string from English to {target_lang_name}.
-
-Context/Description: {context or "No context provided."}
-Translation Key: {key}
-English String: {text}
-{ref_str}
-Instructions:
-- Keep the same formatting, variables, placeholders, or newline characters.
-- Ensure the translation fits the context of an automation/simulation game.
-- Provide ONLY the translation. Do not include any explanations, surrounding quotes, or prefix/suffix text."""
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt}
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 256
-        }
-    }
-    
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=15) as response:
-            res = json.loads(response.read().decode("utf-8"))
-            translated = res["candidates"][0]["content"]["parts"][0]["text"].strip()
-            if (translated.startswith('"') and translated.endswith('"')) or (translated.startswith("'") and translated.endswith("'")):
-                translated = translated[1:-1]
-            return translated
-    except Exception as e:
-        print(f"      [Warning] Gemini API call failed: {e}")
-        return None
-
-
-def translate_text(text: str, target_lang: str, context: str | None = None, key: str = "") -> str:
-    """Translate text from English to target language. Uses Gemini if GEMINI_API_KEY is configured, else falls back to free Google Translate."""
-    # 1. Try Gemini
-    translated = translate_via_gemini(text, target_lang, context, key)
-    if translated:
-        return translated
-        
-    # 2. Fallback to free Google Translate API
-    lang_map = {
-        "zh": "zh-CN",
-    }
-    g_lang = lang_map.get(target_lang, target_lang)
-    
-    url = "https://translate.googleapis.com/translate_a/single"
-    params = {
-        "client": "gtx",
-        "dt": "t",
-        "sl": "en",
-        "tl": g_lang,
-        "q": text
-    }
-    
-    for attempt in range(3):
-        try:
-            query_string = urllib.parse.urlencode(params)
-            req = urllib.request.Request(
-                f"{url}?{query_string}",
-                headers={"User-Agent": "Mozilla/5.0"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                translated_parts = [part[0] for part in result[0] if part[0]]
-                return "".join(translated_parts)
-        except Exception as e:
-            print(f"      [Warning] Google Translate fallback failed (attempt {attempt + 1}/3): {e}")
-            time.sleep(1)
-            
-    return text
 
 
 # ------------------------------------------------------------------ #
@@ -580,7 +467,7 @@ def cmd_extract(mod_dir: Path, output: Path | None) -> None:
 
 
 def cmd_translate_work_order(mod_dir: Path, wo_path: Path | None) -> None:
-    """Automatically translate empty/untranslated keys in the work-order."""
+    """Prepare local terminology references for translation in the agent harness."""
     path = wo_path or (mod_dir / WORK_ORDER_FILENAME)
     if not path.exists():
         sys.exit(f"Error: work-order file not found: {path}")
@@ -588,33 +475,34 @@ def cmd_translate_work_order(mod_dir: Path, wo_path: Path | None) -> None:
     with open(path, "r", encoding="utf-8") as f:
         work_order = json.load(f)
 
-    keys = work_order.get("keys", {})
-    if not keys:
-        print("No keys in work order needing translation.")
-        return
-
-    total_translated = 0
-    print(f"Auto-translating untranslated keys in {path.name}...")
-
-    for key, entry in keys.items():
+    pending = 0
+    for key, entry in work_order.get("keys", {}).items():
         en_val = entry.get("en")
-        context = entry.get("context")
         if not en_val:
             continue
-
-        print(f"  Key: {key}")
+        references = {}
         for lang in SUPPORTED_LANGS:
-            current_val = entry.get(lang)
-            if current_val is None or current_val == en_val or current_val == "":
-                print(f"    -> Translating to {lang}...")
-                translated = translate_text(en_val, lang, context, key)
-                entry[lang] = translated
-                total_translated += 1
+            # Absent locales are already translated and must not be filled again.
+            if lang in entry and entry[lang] in (None, "", en_val):
+                pending += 1
+                terms = get_vanilla_glossary(lang, en_val)
+                if terms:
+                    references[lang] = terms
+        if references:
+            entry["references"] = references
+        else:
+            entry.pop("references", None)
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(work_order, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
-    print(f"Auto-translation complete! Translated {total_translated} values.")
+    print(f"Prepared {path} ({pending} values awaiting translation).")
+    print("Translate the pending locale fields in this JSON using the current agent harness.")
+    print("Use each key, English value, source context, and references to infer meaning.")
+    print("Preserve placeholders, formatting, and newlines; review every changed value.")
+    print("Trial Swedish first. Do not add locale fields that are absent from an entry.")
+    print("After translation and contextual review, run apply, then sync and status.")
 
 
 def cmd_apply(mod_dir: Path, input_path: Path | None) -> None:
@@ -745,29 +633,11 @@ def cmd_status(mod_dir: Path) -> None:
 
 
 def cmd_run_pipeline(mod_dir: Path) -> None:
-    """Run the complete pipeline: extract pending keys -> auto-translate -> apply -> sync."""
-    print(f"=== Starting translation pipeline for {mod_dir.name} ===")
-    
-    # 1. Extract
-    print("\n[Step 1/4] Extracting untranslated keys...")
+    """Extract and prepare a work order, then hand translation to the agent harness."""
+    print(f"Preparing translation work for {mod_dir.name}...")
     cmd_extract(mod_dir, None)
-    
-    # 2. Auto-Translate
-    print("\n[Step 2/4] Translating work-order...")
     cmd_translate_work_order(mod_dir, None)
-    
-    # 3. Apply
-    print("\n[Step 3/4] Applying translations to files...")
-    cmd_apply(mod_dir, None)
-    
-    # 4. Sync
-    print("\n[Step 4/4] Syncing key order...")
-    cmd_sync(mod_dir)
-    
-    # Coverage Report
-    print("\n=== Pipeline complete! Coverage summary: ===")
-    cmd_status(mod_dir)
-    print(f"Note: Check '{WORK_ORDER_FILENAME}' in {mod_dir.name} to review the generated translations.")
+    print("Preparation complete. Locale files have not been changed.")
 
 
 def cmd_glossary(force: bool = False) -> None:
@@ -899,7 +769,7 @@ def main():
     p_extract.add_argument("--output", "-o", help="Output work-order path")
 
     # translate
-    p_translate = subparsers.add_parser("translate", help="Auto-translate empty work-order keys")
+    p_translate = subparsers.add_parser("translate", help="Prepare work order for the agent harness (offline)")
     p_translate.add_argument("--mod", help="Mod directory name or path")
     p_translate.add_argument("--input", "-i", help="Input work-order path")
 
@@ -917,7 +787,7 @@ def main():
     p_status.add_argument("--mod", help="Mod directory name or path (omit for all mods)")
 
     # run
-    p_run = subparsers.add_parser("run", help="Run the entire pipeline (extract -> translate -> apply -> sync)")
+    p_run = subparsers.add_parser("run", help="Extract and prepare work order for the agent harness (offline)")
     p_run.add_argument("--mod", help="Mod directory name or path")
 
     # glossary

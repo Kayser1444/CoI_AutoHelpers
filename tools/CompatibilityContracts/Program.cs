@@ -47,15 +47,13 @@ internal static class Program
             string path = switching ? Path.Combine(root, "implementations", branch, project + ".dll")
                 : Path.Combine(root, project + ".dll");
             using var mod = AssemblyDefinition.ReadAssembly(path, parameters);
+            Check(AllTypes(mod.MainModule.Types).All(t => t.FullName != "CoI.AutoHelpers.Logging.ModDebugWebApi"),
+                project + " must leave web API startup to the game launch command.");
             if (release)
             {
                 CheckRelease(mod);
                 using var selector = AssemblyDefinition.ReadAssembly(Path.Combine(root, project + ".Loader.dll"), parameters);
                 CheckRelease(selector);
-                var startup = AllTypes(mod.MainModule.Types).Single(t => t.FullName == "CoI.AutoHelpers.Logging.ModDebugWebApi")
-                    .Methods.Single(m => m.Name == "Register");
-                Check(startup.Body.Instructions.All(i => i.OpCode.Code is Mono.Cecil.Cil.Code.Nop or Mono.Cecil.Cil.Code.Ret),
-                    project + " Release must not automatically start the web API.");
             }
             var failures = new List<string>();
             foreach (var reference in mod.MainModule.AssemblyReferences.Where(r => r.Name.StartsWith("Mafi", StringComparison.Ordinal)))
